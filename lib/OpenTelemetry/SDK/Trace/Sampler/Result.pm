@@ -6,8 +6,8 @@ package OpenTelemetry::SDK::Trace::Sampler::Result;
 our $VERSION = '0.001';
 
 class OpenTelemetry::SDK::Trace::Sampler::Result {
-    has $trace_state :param;
-    has $attributes  :param = undef;
+    has $trace_state :param :reader;
+    has $attributes  :param :reader = undef;
     has $decision    :param;
 
     ADJUST {
