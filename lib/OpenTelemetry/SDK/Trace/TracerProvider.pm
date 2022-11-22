@@ -20,7 +20,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use OpenTelemetry::Trace::SpanContext;
     use OpenTelemetry::SDK::Trace::Sampler;
     use OpenTelemetry::SDK::Trace::Tracer;
-    use OpenTelemetry::SDK::Trace::Span::Limits;
+    use OpenTelemetry::SDK::Trace::SpanLimits;
     use OpenTelemetry::Common qw(
         timeout_timestamp
         maybe_timeout
@@ -36,7 +36,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     has @span_processors;
 
     ADJUST {
-        $span_limits = OpenTelemetry::SDK::Trace::Span::Limits->new;
+        $span_limits = OpenTelemetry::SDK::Trace::SpanLimits->new;
 
         return if $sampler;
 

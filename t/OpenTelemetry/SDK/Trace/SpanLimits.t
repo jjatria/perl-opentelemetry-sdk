@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Span::Limits';
+use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::SpanLimits';
 
 subtest Defaults => sub {
     is CLASS->new, object {

@@ -1,11 +1,11 @@
 use Object::Pad;
 # ABSTRACT: A class that governs the configuration of spans
 
-package OpenTelemetry::SDK::Trace::Span::Limits;
+package OpenTelemetry::SDK::Trace::SpanLimits;
 
 our $VERSION = '0.001';
 
-class OpenTelemetry::SDK::Trace::Span::Limits {
+class OpenTelemetry::SDK::Trace::SpanLimits {
     use Ref::Util 'is_arrayref';
     use List::Util 'first';
     use Carp 'croak';
