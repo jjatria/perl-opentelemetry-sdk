@@ -5,9 +5,10 @@ package OpenTelemetry::SDK::Trace::Sampler::Constant;
 
 our $VERSION = '0.001';
 
+use OpenTelemetry::SDK::Trace::Sampler::Result;
+
 class OpenTelemetry::SDK::Trace::Sampler::Constant {
     use OpenTelemetry::Trace;
-    use OpenTelemetry::SDK::Trace::Sampler::Result;
 
     has $decision    :param;
     has $description :param :reader;
@@ -23,11 +24,11 @@ class OpenTelemetry::SDK::Trace::Sampler::Constant {
 
 use constant {
     ALWAYS_ON => OpenTelemetry::SDK::Trace::Sampler::Constant->new(
-        decision    => 'RECORD_AND_SAMPLE',
+        decision    => OpenTelemetry::SDK::Trace::Sampler::Result::RECORD_AND_SAMPLE,
         description => 'AlwaysOnSampler',
     ),
     ALWAYS_OFF => OpenTelemetry::SDK::Trace::Sampler::Constant->new(
-        decision    => 'DROP',
+        decision    => OpenTelemetry::SDK::Trace::Sampler::Result::DROP,
         description => 'AlwaysOffSampler',
     ),
 };

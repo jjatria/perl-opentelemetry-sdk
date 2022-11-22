@@ -5,6 +5,12 @@ package OpenTelemetry::SDK::Trace::Sampler::Result;
 
 our $VERSION = '0.001';
 
+use constant {
+    RECORD_AND_SAMPLE => 'RECORD_AND_SAMPLE',
+    RECORD_ONLY       => 'RECORD_ONLY',
+    DROP              => 'DROP',
+};
+
 class OpenTelemetry::SDK::Trace::Sampler::Result {
     has $trace_state :param :reader;
     has $attributes  :param :reader = undef;
@@ -14,7 +20,7 @@ class OpenTelemetry::SDK::Trace::Sampler::Result {
         $attributes //= {};
     }
 
-    method sampled () { $decision eq 'RECORD_AND_SAMPLE' }
+    method sampled () { $decision eq RECORD_AND_SAMPLE }
 
-    method recording () { $decision ne 'DROP' }
+    method recording () { $decision ne DROP }
 }

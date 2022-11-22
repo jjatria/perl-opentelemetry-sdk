@@ -5,11 +5,11 @@ package OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased;
 
 our $VERSION = '0.001';
 
+use OpenTelemetry::SDK::Trace::Sampler::Result;
+
 class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased {
     use String::CRC32 'crc32';
     use namespace::clean -except => 'new';
-
-    use OpenTelemetry::SDK::Trace::Sampler::Result;
 
     has $ratio :param = 1;
     has $description :reader;
@@ -40,12 +40,12 @@ class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased {
         # the Toggle CPAN module
 
         return OpenTelemetry::SDK::Trace::Sampler::Result->new(
-            decision    => 'RECORD_AND_SAMPLE',
+            decision    => OpenTelemetry::SDK::Trace::Sampler::Result::RECORD_AND_SAMPLE,
             trace_state => $trace_state,
         ) if $args{trace_id} && crc32( unpack 'H*', $args{trace_id} ) < $ratio;
 
         return OpenTelemetry::SDK::Trace::Sampler::Result->new(
-            decision    => 'DROP',
+            decision    => OpenTelemetry::SDK::Trace::Sampler::Result::DROP,
             trace_state => $trace_state,
         );
     }
