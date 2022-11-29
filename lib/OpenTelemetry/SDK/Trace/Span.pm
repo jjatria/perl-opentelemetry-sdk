@@ -17,24 +17,25 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
 
     use namespace::clean -except => 'new';
 
+    use OpenTelemetry::Trace;
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;
     use OpenTelemetry::Trace::Span::Status;
+    use OpenTelemetry::SDK::Trace::Span::Snapshot;
 
     has $name       :param;
     has $parent     :param = undef;
     has $kind       :param = 'INTERNAL'; # TODO: representation?
     has $start      :param = undef;
-    has $attributes :param = {};
-    has $context    :reader;
     has $end;
+    has $status;
+    has %attributes;
     has @links;
     has @events;
-    has $status;
 
     ADJUST ($params) {
         undef $start if $start && $start > time;
-        $start //= utime;
+        $start //= time;
 
         $kind = uc $kind;
         $kind = 'INTERNAL' unless $kind =~ /^ (:?
@@ -45,11 +46,15 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             | SERVER
         ) $/x;
 
+        $status = OpenTelemetry::Trace::Span::Status->new;
+
         for my $link ( @{ delete $params->{links} // [] } ) {
             $link isa OpenTelemetry::Trace::Link
                 ? push( @links, $link )
                 : $self->add_link(%$link);
         }
+
+        $self->set_attribute( %{ delete $params->{attributes} // {} } );
     }
 
     method set_name ( $new ) {
@@ -60,13 +65,13 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         $self;
     }
 
-    method set_attribute ( %attributes ) {
+    method set_attribute ( %new ) {
         unless ( $self->recording ) {
             $logger->warn('Attempted to set attributes on a span that is not recording');
             return $self
         }
 
-        for my $pair ( pairs %attributes ) {
+        for my $pair ( pairs %new ) {
             my ( $key, $value ) = @$pair;
 
             if ( is_hashref $value ) {
@@ -74,7 +79,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
                 next;
             }
 
-            if ( is_arrayref $value && any { ref } @$values ) {
+            if ( is_arrayref $value && any { ref } @$value ) {
                 $logger->warnf('Span attribute values that are lists cannot hold references');
                 next;
             }
@@ -84,21 +89,21 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
                 'null';
             };
 
-            $attributes->{$key} = $value;
+            $attributes{$key} = $value;
         }
 
         $self;
     }
 
-    method set_status ( $status, $description = undef ) {
-        return $self if ! $self->recording || $status->ok;
+    method set_status ( $new, $description = undef ) {
+        return $self if !$self->recording || $status->ok;
 
-        my $new = OpenTelemetry::Trace::Span::Status->new(
-            code        => $status,
+        my $value = OpenTelemetry::Trace::Span::Status->new(
+            code        => $new,
             description => $description // '',
         );
 
-        $status = $new unless $new->unset;
+        $status = $value unless $value->unset;
 
         $self;
     }
@@ -136,4 +141,30 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     }
 
     method recording () { ! defined $end }
+
+    method snapshot () {
+        my $parent_span_id = OpenTelemetry::Trace->span_from_context($parent)->context->span_id;
+        my $context = $self->context;
+
+        OpenTelemetry::SDK::Trace::Span::Snapshot->new(
+            name                      => $name,
+            kind                      => $kind,
+            status                    => $status,
+            parent_span_id            => $parent_span_id,
+            total_recorded_attributes => scalar keys %attributes,
+            total_recorded_events     => scalar @events,
+            total_recorded_links      => scalar @links,
+            start_timestamp           => $start,
+            end_timestamp             => $end,
+            attributes                => { %attributes },
+            links                     => [ @links ],
+            events                    => [ @events ],
+            resource                  => 1, # ...,
+            instrumentation_scope     => 1, # ...,
+            span_id                   => $context->span_id,
+            trace_id                  => $context->trace_id,
+            trace_flags               => $context->trace_flags->flags,
+            trace_state               => $context->trace_state,
+        );
+    }
 }
