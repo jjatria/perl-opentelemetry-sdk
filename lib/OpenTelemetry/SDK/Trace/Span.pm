@@ -28,6 +28,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     has $name       :param;
     has $parent     :param = undef;
     has $kind       :param = 'INTERNAL'; # TODO: representation?
+    has $resource   :param = undef;
     has $start      :param = undef;
     has $end;
     has $status;
@@ -153,7 +154,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             attributes                => { %attributes },
             links                     => [ @links ],
             events                    => [ @events ],
-            resource                  => 1, # ...,
+            resource                  => $resource,
             instrumentation_scope     => 1, # ...,
             span_id                   => $context->span_id,
             trace_id                  => $context->trace_id,

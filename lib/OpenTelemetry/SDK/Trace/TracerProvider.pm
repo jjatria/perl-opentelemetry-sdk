@@ -18,6 +18,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use experimental 'try';
 
     use OpenTelemetry::Trace::SpanContext;
+    use OpenTelemetry::SDK::Resource;
     use OpenTelemetry::SDK::Trace::Sampler;
     use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::SDK::Trace::SpanLimits;
@@ -31,11 +32,13 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     has $sampler      :param = undef;
     has $id_generator :param = 'OpenTelemetry::Trace';
     has $span_limits  :param = undef;
+    has $resource     :param = undef;
     has $stopped             = 0;
     has %tracer_registry;
     has @span_processors;
 
     ADJUST {
+        $resource  //= OpenTelemetry::SDK::Resource->new;
         $span_limits = OpenTelemetry::SDK::Trace::SpanLimits->new;
 
         return if $sampler;
@@ -94,7 +97,8 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         }
 
         $span{trace_id} //= $id_generator->generate_trace_id;
-        $span{span_id} = $id_generator->generate_span_id;
+        $span{span_id}    = $id_generator->generate_span_id;
+        $span{resource}   = $resource;
 
         my $result = $sampler->should_sample(
             trace_id   => $span{trace_id},

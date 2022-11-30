@@ -20,7 +20,7 @@ is CLASS->new( name => 'foo' ), object {
         call      attributes                => {};
         call_list links                     => [];
         call_list events                    => [];
-        call      resource                  => 1;
+        call      resource                  => U;
         call      instrumentation_scope     => 1;
         call      trace_id                  => validator sub { length == 16 };
         call      trace_flags               => 0;
