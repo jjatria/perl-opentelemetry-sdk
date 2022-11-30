@@ -15,6 +15,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use Ref::Util qw( is_arrayref is_hashref );
     use List::Util qw( any pairs );
 
+    use OpenTelemetry::Common 'validate_attribute_value';
+
     use namespace::clean -except => 'new';
 
     use OpenTelemetry::Trace;
@@ -74,15 +76,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         for my $pair ( pairs %new ) {
             my ( $key, $value ) = @$pair;
 
-            if ( is_hashref $value ) {
-                $logger->warnf('Span attribute values cannot be hash references');
-                next;
-            }
-
-            if ( is_arrayref $value && any { ref } @$value ) {
-                $logger->warnf('Span attribute values that are lists cannot hold references');
-                next;
-            }
+            next unless validate_attribute_value $value;
 
             $key ||= do {
                 $logger->warnf("Span attribute names should not be empty. Setting to 'null' instead");
