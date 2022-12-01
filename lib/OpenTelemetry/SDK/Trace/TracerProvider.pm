@@ -18,10 +18,11 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use experimental 'try';
 
     use OpenTelemetry::Trace::SpanContext;
+    use OpenTelemetry::SDK::InstrumentationScope;
     use OpenTelemetry::SDK::Resource;
     use OpenTelemetry::SDK::Trace::Sampler;
-    use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::SDK::Trace::SpanLimits;
+    use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::Common qw(
         timeout_timestamp
         maybe_timeout
@@ -127,11 +128,10 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         OpenTelemetry->logger->warnf('Got invalid tracer name when retrieving tracer: %s', $args{name})
             unless $args{name};
 
-        $args{name}    //= '';
-        $args{version} //= '';
+        my $scope = OpenTelemetry::SDK::InstrumentationScope->new( %args{qw( name version )} );
 
         # TODO: lock?
-        $tracer_registry{ join ':', @args{qw( name version )} } //= OpenTelemetry::SDK::Trace::Tracer->new(
+        $tracer_registry{ $scope->to_string } //= OpenTelemetry::SDK::Trace::Tracer->new(
             %args,
             span_creator => sub { $self->$create_span(@_) },
         );
