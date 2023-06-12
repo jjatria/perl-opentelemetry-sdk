@@ -17,7 +17,7 @@ class OpenTelemetry::SDK::Resource {
     has %attributes;
     has $schema_url :param :reader = '';
 
-    ADJUST ( $params ) {
+    ADJUSTPARAMS ( $params ) {
         my %new = map { split '=', $_, 2 } split ',', config('RESOURCE_ATTRIBUTES') // '';
         %new = ( %new, %{ delete $params->{attributes} // {} } );
 

@@ -24,7 +24,7 @@ class OpenTelemetry::SDK::Trace::Span::Snapshot {
     has $trace_flags               :param :reader; # Integer (8-bit byte of bit flags)
     has $trace_state               :param :reader; # OpenTelemetry::Trace::Tracestate
 
-    ADJUST ( $params ) {
+    ADJUSTPARAMS ( $params ) {
         @events = @{ delete $params->{events} // [] };
         @links  = @{ delete $params->{links}  // [] };
     }

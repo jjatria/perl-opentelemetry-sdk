@@ -36,7 +36,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     has @links;
     has @events;
 
-    ADJUST ($params) {
+    ADJUSTPARAMS ( $params ) {
         undef $start if $start && $start > time;
         $start //= time;
 
