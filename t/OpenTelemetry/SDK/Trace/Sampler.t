@@ -2,6 +2,8 @@
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Sampler';
 
+use OpenTelemetry::Test::Logs;
+
 is CLASS->ALWAYS_OFF, object {
     prop isa => 'OpenTelemetry::SDK::Trace::Sampler::Constant';
     call description => 'AlwaysOffSampler';
@@ -25,10 +27,19 @@ subtest Constructor => sub {
         prop isa => 'OpenTelemetry::SDK::Trace::Sampler::ParentBased';
     }, 'Can create other samplers';
 
+    OpenTelemetry::Test::Logs->clear;
+
     is CLASS->new( FakeSampler => ( root => mock ) ), object {
         prop isa         => 'OpenTelemetry::SDK::Trace::Sampler::Constant';
         call description => 'AlwaysOffSampler';
     }, 'Falls back to ALWAYS_OFF';
+
+    is + OpenTelemetry::Test::Logs->messages, [
+        [
+            warning => 'OpenTelemetry',
+            match qr/^Cannot create FakeSampler sampler: /
+        ],
+    ], 'Unknown sampler is logged';
 };
 
 done_testing;
