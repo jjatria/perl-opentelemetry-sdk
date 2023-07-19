@@ -7,19 +7,18 @@ our $VERSION = '0.001';
 
 use OpenTelemetry;
 
-# TODO: Move somewhere shared
-use constant {
-    EXPORT_SUCCESS => 0,
-    EXPORT_FAILURE => 1,
-    EXPORT_TIMEOUT => 2,
-};
-
 class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::TracerProvider) {
     use experimental 'try';
 
     use Future;
     use Future::Mutex;
     use Future::AsyncAwait;
+
+    use OpenTelemetry::Trace qw(
+        EXPORT_FAILURE
+        EXPORT_TIMEOUT
+        EXPORT_SUCCESS
+    );
 
     use OpenTelemetry::Trace::SpanContext;
     use OpenTelemetry::SDK::InstrumentationScope;
