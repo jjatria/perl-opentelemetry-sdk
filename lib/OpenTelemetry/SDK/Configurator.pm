@@ -13,7 +13,7 @@ class OpenTelemetry::SDK::Configurator {
 
     use OpenTelemetry;
     use OpenTelemetry::Common 'config';
-    use OpenTelemetry::Context::Propagation::Composite;
+    use OpenTelemetry::Propagator::Composite;
     use OpenTelemetry::SDK::Trace::TracerProvider;
 
     use namespace::clean -except => 'new';
@@ -62,7 +62,7 @@ class OpenTelemetry::SDK::Configurator {
         }
 
         OpenTelemetry->propagation(
-            OpenTelemetry::Context::Propagation::Composite->new(@propagators),
+            OpenTelemetry::Propagator::Composite->new(@propagators),
         );
     }
 
