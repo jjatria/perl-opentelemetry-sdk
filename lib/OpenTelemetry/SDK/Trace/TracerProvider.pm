@@ -82,7 +82,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         catch ($e) {
             my $default = OpenTelemetry::SDK::Trace::Sampler->new(
                 ParentBased => ( root => OpenTelemetry::SDK::Trace::Sampler::ALWAYS_ON )
-            ) if $_ eq 'parentbased_always_on';
+            );
 
             OpenTelemetry->handle_error(
                 exception => $e,
