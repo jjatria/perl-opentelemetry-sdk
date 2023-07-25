@@ -64,7 +64,7 @@ OpenTelemetry::SDK::Trace::Processor::Simple - A basic OpenTelemetry span proces
 
 This is a simple span processor that receives read-only
 L<OpenTelemetry::Trace::Span> instances and forwards them to an exporter as
-writable writable instances of L<OpenTelemetry::SDK::Trace::SpanData>.
+writable instances of L<OpenTelemetry::SDK::Trace::SpanData>.
 
 This processor will mostly be usedful for testing. It could be suitable for
 use in production environments in cases where custom attributes should be
