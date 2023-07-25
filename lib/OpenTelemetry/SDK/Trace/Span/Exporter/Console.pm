@@ -8,10 +8,15 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SDK::Trace::Span::Exporter) {
     use Future::AsyncAwait;
 
+    use OpenTelemetry::Trace qw(
+        EXPORT_FAILURE
+        EXPORT_SUCCESS
+    );
+
     has $stopped;
 
     async method export (%args) {
-        return 0 if $stopped;
+        return EXPORT_FAILURE if $stopped;
 
         require Data::Dumper;
         local $Data::Dumper::Indent = 0;
@@ -19,10 +24,10 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
 
         Data::Dumper::Dumper($_) for @{ $args{spans} // [] };
 
-        1;
+        EXPORT_SUCCESS;
     }
 
-    async method shutdown ( $timeout = undef ) { $stopped = 1 }
+    async method shutdown ( $timeout = undef ) { $stopped = 1; EXPORT_SUCCESS }
 
-    async method force_flush ( $timeout = undef ) { 1 }
+    async method force_flush ( $timeout = undef ) { EXPORT_SUCCESS }
 }

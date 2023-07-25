@@ -8,18 +8,20 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SDK::Trace::Span::Processor) {
     use experimental 'try';
 
-    use OpenTelemetry;
     use Future::AsyncAwait;
+
+    use OpenTelemetry;
+    use OpenTelemetry::Trace 'EXPORT_SUCCESS';
 
     has $exporter :param;
 
     # TODO: validate exporter?
 
-    method on_start ( $span, $context ) { 1 }
+    method on_start ( $span, $context ) { EXPORT_SUCCESS }
 
     method on_end ($span) {
         try {
-            return 1 unless $span->context->trace_flags->sampled;
+            return EXPORT_SUCCESS unless $span->context->trace_flags->sampled;
             $exporter->export($span->data);
         }
         catch ($e) {
@@ -29,7 +31,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
             );
         };
 
-        return 1;
+        return EXPORT_SUCCESS;
     }
 
     async method shutdown ( $timeout = undef ) {
