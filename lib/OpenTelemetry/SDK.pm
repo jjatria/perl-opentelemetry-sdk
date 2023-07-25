@@ -22,10 +22,10 @@ sub import ( $class, @options ) {
     }
 }
 
-sub configure ( $, $block ) {
+sub configure ( $, $block = undef ) {
     try {
         my $configurator = OpenTelemetry::SDK::Configurator->new;
-        $configurator->$block;
+        $configurator->$block if $block;
         $configurator->configure;
     }
     catch ($e) {
