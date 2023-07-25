@@ -11,11 +11,16 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
     use Future::AsyncAwait;
 
     use OpenTelemetry;
+    use OpenTelemetry::X;
     use OpenTelemetry::Trace 'EXPORT_SUCCESS';
 
     has $exporter :param;
 
-    # TODO: validate exporter?
+    ADJUST {
+        die OpenTelemetry::X->create(
+            Invalid => "Exporter does not support 'export' method: " . ( ref $exporter || $exporter )
+        ) unless $exporter->can('export'); # TODO: is there an isa for roles?
+    }
 
     method on_start ( $span, $context ) { EXPORT_SUCCESS }
 
