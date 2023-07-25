@@ -10,6 +10,18 @@ use experimental qw( try signatures );
 use OpenTelemetry;
 use OpenTelemetry::SDK::Configurator;
 
+# Experimental
+sub import ( $class, @options ) {
+    while ( my $option = shift @options ) {
+        if ( $option eq '-configure' ) {
+            $class->configure;
+            next;
+        }
+
+        die "Unknown import option: $option";
+    }
+}
+
 sub configure ( $, $block ) {
     try {
         my $configurator = OpenTelemetry::SDK::Configurator->new;
