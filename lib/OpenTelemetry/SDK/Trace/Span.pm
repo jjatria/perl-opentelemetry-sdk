@@ -11,9 +11,10 @@ use OpenTelemetry;
 my $logger = OpenTelemetry->logger;
 
 class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
-    use Time::HiRes 'time';
-    use Ref::Util qw( is_arrayref is_hashref );
     use List::Util qw( any pairs );
+    use Mutex;
+    use Ref::Util qw( is_arrayref is_hashref );
+    use Time::HiRes 'time';
 
     use OpenTelemetry::Common 'validate_attribute_value';
 
@@ -35,6 +36,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     has %attributes;
     has @links;
     has @events;
+    has @processors;
+    has $lock;
 
     ADJUSTPARAMS ( $params ) {
         undef $start if $start && $start > time;
@@ -51,6 +54,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
 
         $status = OpenTelemetry::Trace::Span::Status->new;
 
+        @processors = @{ delete $params->{processors} // [] };
+
         for my $link ( @{ delete $params->{links} // [] } ) {
             $link isa OpenTelemetry::Trace::Link
                 ? push( @links, $link )
@@ -58,6 +63,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         }
 
         $self->set_attribute( %{ delete $params->{attributes} // {} } );
+
+        $lock = Mutex->new;
     }
 
     method set_name ( $new ) {
@@ -127,10 +134,17 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         $self;
     }
 
-    method finish ( $time = undef ) {
-        return $self unless $self->recording;
+    method end ( $time = undef ) {
+        return $self unless $lock->enter( sub {
+            unless ($self->recording) {
+                $logger->warn('Calling end on an ended Span');
+                return;
+            }
 
-        $end = $time // time;
+            $end = $time // time;
+        });
+
+        $_->on_end($self) for @processors;
 
         $self;
     }
