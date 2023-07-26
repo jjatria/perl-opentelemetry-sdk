@@ -21,7 +21,7 @@ class OpenTelemetry::SDK::Configurator {
     has $tracer_provider;
 
     ADJUST {
-        $tracer_provider = OpenTelemetry::SDK::Tracer::TracerProvider->new;
+        $tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider->new;
     }
 
     method $configure_propagators {
