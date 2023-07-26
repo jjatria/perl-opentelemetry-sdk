@@ -20,16 +20,15 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         EXPORT_SUCCESS
     );
 
-    use OpenTelemetry::Trace::SpanContext;
+    use OpenTelemetry::Common qw( timeout_timestamp maybe_timeout );
+    use OpenTelemetry::Propagator::TraceContext::TraceFlags;
     use OpenTelemetry::SDK::InstrumentationScope;
     use OpenTelemetry::SDK::Resource;
     use OpenTelemetry::SDK::Trace::Sampler;
+    use OpenTelemetry::SDK::Trace::Span;
     use OpenTelemetry::SDK::Trace::SpanLimits;
     use OpenTelemetry::SDK::Trace::Tracer;
-    use OpenTelemetry::Common qw(
-        timeout_timestamp
-        maybe_timeout
-    );
+    use OpenTelemetry::Trace::SpanContext;
 
     use namespace::clean -except => 'new';
 
@@ -94,21 +93,21 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method $create_span (%args) {
-        my %span = %args{qw( name parent kind start )};
+        my %span = %args{qw( name parent kind start scope )};
 
+        my ( $trace_id, $parent_span_id );
         {
             my $parent = OpenTelemetry::Trace
                 ->span_from_context( $args{parent} )->context;
 
             if ( $parent->valid ) {
-                $span{parent_span_id} = $parent->span_id;
-                $span{trace_id}       = $parent->trace_id;
+                $parent_span_id = $parent->span_id;
+                $trace_id       = $parent->trace_id;
             }
         }
 
-        $span{trace_id} //= $id_generator->generate_trace_id;
-        $span{span_id}    = $id_generator->generate_span_id;
-        $span{resource}   = $resource;
+        $trace_id //= $id_generator->generate_trace_id;
+        my $span_id = $id_generator->generate_span_id;
 
         my $result = $sampler->should_sample(
             trace_id   => $span{trace_id},
@@ -121,13 +120,28 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
         $span{attributes} = { %{ $args{attributes} // {} }, %{ $result->attributes } };
 
-        return OpenTelemetry::SDK::Trace::Span->new(%span)
-            if $result->recording && !$stopped;
+        if ( $result->recording && !$stopped ) {
+            my $flags = $result->sampled
+                ? OpenTelemetry::Propagator::TraceContext::TraceFlags->new(1)
+                : OpenTelemetry::Propagator::TraceContext::TraceFlags->new(0);
+
+            my $context = OpenTelemetry::Trace::SpanContext->new(
+                trace_id    => $trace_id,
+                span_id     => $span_id,
+                trace_flags => $flags,
+            );
+
+            $span{context}    = $context;
+            $span{resource}   = $resource;
+            $span{processors} = [ @span_processors ];
+
+            return OpenTelemetry::SDK::Trace::Span->new(%span);
+        }
 
         OpenTelemetry::Trace->non_recording_span(
             OpenTelemetry::Trace::SpanContext->new(
-                trace_id    => $span{trace_id},
-                span_id     => $span{span_id},
+                trace_id    => $trace_id,
+                span_id     => $span_id,
                 trace_state => $result->trace_state,
             )
         );
@@ -142,7 +156,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         $registry_lock->enter( sub {
             $registry{ $scope->to_string } //= OpenTelemetry::SDK::Trace::Tracer->new(
                 %args,
-                span_creator => sub { $self->$create_span(@_) },
+                span_creator => sub { $self->$create_span( @_, scope => $scope ) },
             );
         });
     }

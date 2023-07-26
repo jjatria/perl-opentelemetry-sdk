@@ -15,14 +15,15 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
 
     has $stopped;
 
-    async method export (%args) {
+    async method export (@spans) {
         return EXPORT_FAILURE if $stopped;
 
         require Data::Dumper;
-        local $Data::Dumper::Indent = 0;
-        local $Data::Dumper::Terse  = 1;
+        local $Data::Dumper::Indent   = 0;
+        local $Data::Dumper::Terse    = 1;
+        local $Data::Dumper::Sortkeys = 1;
 
-        Data::Dumper::Dumper($_) for @{ $args{spans} // [] };
+        warn Data::Dumper::Dumper($_) . "\n" for @spans;
 
         EXPORT_SUCCESS;
     }

@@ -3,28 +3,30 @@
 use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Span';
 
 use OpenTelemetry::Trace;
+use OpenTelemetry::SDK::InstrumentationScope;
 
-is CLASS->new( name => 'foo' ), object {
-    call snapshot => object {
-        prop isa  => 'OpenTelemetry::SDK::Trace::Span::Snapshot';
-        call      name                      => 'foo';
-        call      span_id                   => validator sub { length == 8 };
-        call      parent_span_id            => validator sub { unpack('H*', $_) eq '0000000000000000' };
-        call      kind                      => 'INTERNAL';
-        call      status                    => object { call unset => T };
-        call      total_recorded_attributes => 0;
-        call      total_recorded_events     => 0;
-        call      total_recorded_links      => 0;
-        call      start_timestamp           => T;
-        call      end_timestamp             => U;
-        call      attributes                => {};
-        call_list links                     => [];
-        call_list events                    => [];
-        call      resource                  => U;
-        call      instrumentation_scope     => 1;
-        call      trace_id                  => validator sub { length == 16 };
-        call      trace_flags               => 0;
-        call      trace_state               => object { };
+my $scope = OpenTelemetry::SDK::InstrumentationScope->new( name => 'test' );
+
+is CLASS->new( name => 'foo', scope => $scope ), object {
+    call snapshot => +{
+        name                      => 'foo',
+        span_id                   => match qr/^[0-9a-z]{16}$/,
+        parent_span_id            => DNE,
+        kind                      => 'INTERNAL',
+        status                    => 'UNSET',
+        total_recorded_attributes => 0,
+        total_recorded_events     => 0,
+        total_recorded_links      => 0,
+        start_timestamp           => T,
+        end_timestamp             => U,
+        attributes                => {},
+        links                     => [],
+        events                    => [],
+        resource                  => {},
+        instrumentation_scope     => '[test:]',
+        trace_id                  => match qr/^[0-9a-z]{32}$/,
+        trace_flags               => 0,
+        trace_state               => '',
     };
 }, 'Can create readable snapshot';
 

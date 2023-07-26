@@ -24,20 +24,20 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;
     use OpenTelemetry::Trace::Span::Status;
-    use OpenTelemetry::SDK::Trace::Span::Snapshot;
 
+    has $end;
+    has $kind       :param = 'INTERNAL'; # TODO: representation?
+    has $lock;
     has $name       :param;
     has $parent     :param = undef;
-    has $kind       :param = 'INTERNAL'; # TODO: representation?
     has $resource   :param = undef;
+    has $scope      :param;
     has $start      :param = undef;
-    has $end;
     has $status;
     has %attributes;
-    has @links;
     has @events;
+    has @links;
     has @processors;
-    has $lock;
 
     ADJUSTPARAMS ( $params ) {
         undef $start if $start && $start > time;
@@ -152,28 +152,36 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     method recording () { ! defined $end }
 
     method snapshot () {
-        my $parent_span_id = OpenTelemetry::Trace->span_from_context($parent)->context->span_id;
         my $context = $self->context;
 
-        OpenTelemetry::SDK::Trace::Span::Snapshot->new(
-            name                      => $name,
+        my %snapshot = (
+            attributes                => { %attributes },
+            end_timestamp             => $end,
+            events                    => [ @events ],
+            instrumentation_scope     => $scope->to_string,
             kind                      => $kind,
-            status                    => $status,
-            parent_span_id            => $parent_span_id,
+            links                     => [ @links ],
+            name                      => $name,
+            span_id                   => $context->hex_span_id,
+            start_timestamp           => $start,
+            status                    => $status->to_string,
             total_recorded_attributes => scalar keys %attributes,
             total_recorded_events     => scalar @events,
             total_recorded_links      => scalar @links,
-            start_timestamp           => $start,
-            end_timestamp             => $end,
-            attributes                => { %attributes },
-            links                     => [ @links ],
-            events                    => [ @events ],
-            resource                  => $resource,
-            instrumentation_scope     => 1, # ...,
-            span_id                   => $context->span_id,
-            trace_id                  => $context->trace_id,
             trace_flags               => $context->trace_flags->flags,
-            trace_state               => $context->trace_state,
+            trace_id                  => $context->hex_trace_id,
+            trace_state               => $context->trace_state->to_string,
         );
+
+        $snapshot{resource} = $resource ? $resource->attributes : {};
+
+        my $span_context = OpenTelemetry::Trace
+            ->span_from_context($parent)
+            ->context;
+
+        $snapshot{parent_span_id} = $span_context->hex_span_id
+            if $span_context->valid;
+
+        \%snapshot;
     }
 }

@@ -10,7 +10,6 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
 
     use Future::AsyncAwait;
 
-    use OpenTelemetry;
     use OpenTelemetry::X;
     use OpenTelemetry::Trace 'EXPORT_SUCCESS';
 
@@ -27,7 +26,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
     method on_end ($span) {
         try {
             return EXPORT_SUCCESS unless $span->context->trace_flags->sampled;
-            $exporter->export($span->data);
+            $exporter->export($span->snapshot);
         }
         catch ($e) {
             OpenTelemetry->handle_error(
