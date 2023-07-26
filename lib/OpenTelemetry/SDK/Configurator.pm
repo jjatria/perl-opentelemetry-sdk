@@ -90,7 +90,7 @@ class OpenTelemetry::SDK::Configurator {
 
             my $exporter  = 'OpenTelemetry::SDK::Trace::Span::Exporter::' . $map{$name};
             my $processor = 'OpenTelemetry::SDK::Trace::Span::Processor::'
-                . $name eq 'console' ? 'Simple' : 'Batch';
+                . ( $name eq 'console' ? 'Simple' : 'Batch' );
 
             try {
                 Module::Runtime::require_module $exporter;
