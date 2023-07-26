@@ -35,7 +35,7 @@ class OpenTelemetry::SDK::Resource {
         }
     }
 
-    method attributes () { %{ dclone \%attributes } }
+    method attributes () { dclone \%attributes }
 
     method merge ( $new ) {
         return $self unless $new isa OpenTelemetry::SDK::Resource;
@@ -49,7 +49,7 @@ class OpenTelemetry::SDK::Resource {
         }
 
         ( ref $self )->new(
-            attributes => { $self->attributes, $new->attributes },
+            attributes => { %{ $self->attributes }, %{ $new->attributes } },
             schema_url => $theirs || $ours,
         );
     }
