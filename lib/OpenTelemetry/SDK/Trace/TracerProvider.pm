@@ -10,9 +10,9 @@ use OpenTelemetry;
 class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::TracerProvider) {
     use experimental 'try';
 
-    use Future;
-    use Future::Mutex;
     use Future::AsyncAwait;
+    use Future;
+    use Mutex;
 
     use OpenTelemetry::Trace qw(
         EXPORT_FAILURE
@@ -48,8 +48,8 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         $resource  //= OpenTelemetry::SDK::Resource->new;
         $span_limits = OpenTelemetry::SDK::Trace::SpanLimits->new;
 
-        $lock          = Future::Mutex->new;
-        $registry_lock = Future::Mutex->new;
+        $lock          = Mutex->new;
+        $registry_lock = Mutex->new;
 
         return if $sampler;
 
@@ -144,7 +144,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
                 %args,
                 span_creator => sub { $self->$create_span(@_) },
             );
-        })->get;
+        });
     }
 
     async method $atomic_call_on_processors ( $method, $timeout ) {
@@ -179,7 +179,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
             sub {
                 $self->$atomic_call_on_processors( 'shutdown', $timeout );
             }
-        )->get;
+        );
     }
 
     method force_flush ( $timeout = undef ) {
@@ -189,7 +189,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
             sub {
                 $self->$atomic_call_on_processors( 'force_flush', $timeout );
             }
-        )->get;
+        );
     }
 
     method add_span_processor ($processor) {
@@ -203,7 +203,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
                 push @span_processors, $processor;
                 Future->done;
             }
-        )->get;
+        );
 
         $self;
     }
