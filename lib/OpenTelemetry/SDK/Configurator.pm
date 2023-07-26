@@ -112,9 +112,7 @@ class OpenTelemetry::SDK::Configurator {
 
         $self->$configure_propagators;
         $self->$configure_span_processors;
-        OpenTelemetry->tracer_provider(
-            OpenTelemetry::SDK::Trace::TracerProvider->new
-        );
+        OpenTelemetry->tracer_provider($tracer_provider);
 
         return;
     }
