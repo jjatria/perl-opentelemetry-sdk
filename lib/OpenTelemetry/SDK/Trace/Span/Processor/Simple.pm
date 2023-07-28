@@ -27,7 +27,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
         try {
             return TRACE_EXPORT_SUCCESS
                 unless $span->context->trace_flags->sampled;
-            $exporter->export($span->snapshot);
+            $exporter->export( [$span->snapshot] );
         }
         catch ($e) {
             OpenTelemetry->handle_error(

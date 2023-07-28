@@ -12,7 +12,7 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
 
     has $stopped;
 
-    async method export (@spans) {
+    async method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;
 
         require Data::Dumper;
@@ -20,7 +20,7 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
         local $Data::Dumper::Terse    = 1;
         local $Data::Dumper::Sortkeys = 1;
 
-        warn Data::Dumper::Dumper($_) . "\n" for @spans;
+        warn Data::Dumper::Dumper($_) . "\n" for @$spans;
 
         TRACE_EXPORT_SUCCESS;
     }
