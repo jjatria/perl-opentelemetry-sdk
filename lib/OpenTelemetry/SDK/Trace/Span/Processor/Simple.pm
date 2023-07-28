@@ -34,7 +34,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
                 exception => $e,
                 message   => sprintf('unexpected error in %s->on_end', ref $self),
             );
-        };
+        }
 
         return TRACE_EXPORT_SUCCESS;
     }
