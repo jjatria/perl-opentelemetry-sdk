@@ -9,9 +9,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
     use experimental 'try';
 
     use Future::AsyncAwait;
-
     use OpenTelemetry::X;
-    use OpenTelemetry::Constants 'TRACE_EXPORT_SUCCESS';
 
     has $exporter :param;
 
@@ -21,12 +19,11 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
         ) unless $exporter->can('export'); # TODO: is there an isa for roles?
     }
 
-    method on_start ( $span, $context ) { TRACE_EXPORT_SUCCESS }
+    method on_start ( $span, $context ) { }
 
     method on_end ($span) {
         try {
-            return TRACE_EXPORT_SUCCESS
-                unless $span->context->trace_flags->sampled;
+            return unless $span->context->trace_flags->sampled;
             $exporter->export( [$span->snapshot] );
         }
         catch ($e) {
@@ -36,7 +33,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
             );
         }
 
-        return TRACE_EXPORT_SUCCESS;
+        return;
     }
 
     async method shutdown ( $timeout = undef ) {
