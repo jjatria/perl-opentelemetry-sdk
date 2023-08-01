@@ -1,5 +1,4 @@
-use v5.26;
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 
 use feature 'isa';
 
@@ -28,27 +27,25 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Trace::Span::Status;
     use OpenTelemetry::SDK::Trace::Span::Readable;
 
-    has $end;
-    has $kind       :param = INTERNAL;
-    has $lock;
-    has $name       :param;
-    has $parent     :param = undef;
-    has $resource   :param = undef;
-    has $scope      :param;
-    has $start      :param = undef;
-    has $status;
-    has %attributes;
-    has @events;
-    has @links;
-    has @processors;
+    field $end;
+    field $kind       :param = INTERNAL;
+    field $lock              = Mutex->new;
+    field $name       :param;
+    field $parent     :param = undef;
+    field $resource   :param = undef;
+    field $scope      :param;
+    field $start      :param = undef;
+    field $status            = OpenTelemetry::Trace::Span::Status->unset;
+    field %attributes;
+    field @events;
+    field @links;
+    field @processors;
 
     ADJUSTPARAMS ( $params ) {
         undef $start if $start && $start > time;
         $start //= time;
 
         $kind = INTERNAL if $kind < INTERNAL || $kind > CONSUMER;
-
-        $status = OpenTelemetry::Trace::Span::Status->new;
 
         @processors = @{ delete $params->{processors} // [] };
 
@@ -59,8 +56,6 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         }
 
         $self->set_attribute( %{ delete $params->{attributes} // {} } );
-
-        $lock = Mutex->new;
     }
 
     method set_name ( $new ) {

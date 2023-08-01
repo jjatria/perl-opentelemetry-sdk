@@ -44,7 +44,7 @@
             "Future" : "0.26",
             "Future::AsyncAwait" : "0.38",
             "Mutex" : "0",
-            "Object::Pad" : "0.51",
+            "Object::Pad" : "0.74",
             "OpenTelemetry" : "0",
             "Storable" : "0",
             "String::CRC32" : "0",

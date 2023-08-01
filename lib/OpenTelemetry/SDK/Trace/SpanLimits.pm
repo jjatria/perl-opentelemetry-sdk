@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: A class that governs the configuration of spans
 
 package OpenTelemetry::SDK::Trace::SpanLimits;
@@ -13,23 +13,15 @@ class OpenTelemetry::SDK::Trace::SpanLimits {
 
     use namespace::clean -except => 'new';
 
-    has $attribute_count_limit        :reader;
-    has $attribute_length_limit       :reader;
-    has $event_attribute_count_limit  :reader;
-    has $event_attribute_length_limit :reader;
-    has $event_count_limit            :reader;
-    has $link_attribute_count_limit   :reader;
-    has $link_count_limit             :reader;
+    field $attribute_count_limit        :reader = config(qw( SPAN_ATTRIBUTE_COUNT_LIMIT          ATTRIBUTE_COUNT_LIMIT        )) // 128;
+    field $attribute_length_limit       :reader = config(qw( SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT   ATTRIBUTE_VALUE_LENGTH_LIMIT ));
+    field $event_attribute_count_limit  :reader = config(qw( EVENT_ATTRIBUTE_VALUE_COUNT_LIMIT   ATTRIBUTE_COUNT_LIMIT        )) // 128;
+    field $event_attribute_length_limit :reader = config(qw( EVENT_ATTRIBUTE_VALUE_LENGTH_LIMIT  ATTRIBUTE_VALUE_LENGTH_LIMIT )) // 128;
+    field $event_count_limit            :reader = config(qw( SPAN_EVENT_COUNT_LIMIT                                           )) // 128;
+    field $link_attribute_count_limit   :reader = config(qw( LINK_ATTRIBUTE_COUNT_LIMIT                                       )) // 128;
+    field $link_count_limit             :reader = config(qw( SPAN_LINK_COUNT_LIMIT                                            )) // 128;
 
     ADJUST {
-        $attribute_count_limit        = config(qw( SPAN_ATTRIBUTE_COUNT_LIMIT          ATTRIBUTE_COUNT_LIMIT        )) // 128;
-        $attribute_length_limit       = config(qw( SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT   ATTRIBUTE_VALUE_LENGTH_LIMIT ));
-        $event_attribute_count_limit  = config(qw( EVENT_ATTRIBUTE_VALUE_COUNT_LIMIT   ATTRIBUTE_COUNT_LIMIT        )) // 128;
-        $event_attribute_length_limit = config(qw( EVENT_ATTRIBUTE_VALUE_LENGTH_LIMIT  ATTRIBUTE_VALUE_LENGTH_LIMIT )) // 128;
-        $event_count_limit            = config(qw( SPAN_EVENT_COUNT_LIMIT                                           )) // 128;
-        $link_attribute_count_limit   = config(qw( LINK_ATTRIBUTE_COUNT_LIMIT                                       )) // 128;
-        $link_count_limit             = config(qw( SPAN_LINK_COUNT_LIMIT                                            )) // 128;
-
         croak "attribute_count_limit must be positive, it is '$attribute_count_limit'"
             unless $attribute_count_limit > 0;
 

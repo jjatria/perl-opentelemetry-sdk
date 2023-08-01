@@ -8,9 +8,9 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Tracer :isa(OpenTelemetry::Trace::Tracer) {
     use OpenTelemetry::Constants 'SPAN_KIND_INTERNAL';
 
-    has $name         :param;
-    has $version      :param;
-    has $span_creator :param;
+    field $name         :param;
+    field $version      :param;
+    field $span_creator :param;
 
     method create_span ( %args ) {
         $args{name} //= 'empty';

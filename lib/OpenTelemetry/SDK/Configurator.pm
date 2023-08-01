@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: Encapsulates the configuration of the OpenTelemetry SDK
 
 package OpenTelemetry::SDK::Configurator;
@@ -18,11 +18,7 @@ class OpenTelemetry::SDK::Configurator {
 
     use namespace::clean -except => 'new';
 
-    has $tracer_provider;
-
-    ADJUST {
-        $tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider->new;
-    }
+    field $tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider->new;
 
     method $configure_propagators {
         state %map = (

@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: The result of a sampling decision
 
 package OpenTelemetry::SDK::Trace::Sampler::Result;
@@ -12,13 +12,9 @@ use constant {
 };
 
 class OpenTelemetry::SDK::Trace::Sampler::Result {
-    has $trace_state :param :reader;
-    has $attributes  :param :reader = undef;
-    has $decision    :param;
-
-    ADJUST {
-        $attributes //= {};
-    }
+    field $trace_state :param :reader;
+    field $attributes  :param :reader //= {};
+    field $decision    :param;
 
     method sampled () { $decision eq RECORD_AND_SAMPLE }
 

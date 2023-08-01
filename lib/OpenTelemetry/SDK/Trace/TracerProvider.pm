@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: A TracerProvider for the OpenTelemetry SDK
 
 package OpenTelemetry::SDK::Trace::TracerProvider;
@@ -28,24 +28,18 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
     use namespace::clean -except => 'new';
 
-    has $sampler      :param = undef;
-    has $id_generator :param = 'OpenTelemetry::Trace';
-    has $span_limits  :param = undef;
-    has $resource     :param = undef;
-    has $stopped             = 0;
-    has %registry;
-    has @span_processors;
+    field $sampler      :param = undef;
+    field $id_generator :param = 'OpenTelemetry::Trace';
+    field $span_limits  :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
+    field $resource     :param //= OpenTelemetry::SDK::Resource->new;
+    field $stopped             = 0;
+    field %registry;
+    field @span_processors;
 
-    has $lock;
-    has $registry_lock;
+    field $lock          //= Mutex->new;
+    field $registry_lock //= Mutex->new;
 
     ADJUST {
-        $resource  //= OpenTelemetry::SDK::Resource->new;
-        $span_limits = OpenTelemetry::SDK::Trace::SpanLimits->new;
-
-        $lock          = Mutex->new;
-        $registry_lock = Mutex->new;
-
         return if $sampler;
 
         try {

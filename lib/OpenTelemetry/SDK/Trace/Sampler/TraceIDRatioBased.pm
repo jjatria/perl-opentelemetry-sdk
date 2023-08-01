@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: A sampler based on the trace ID
 
 package OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased;
@@ -11,8 +11,8 @@ class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased {
     use String::CRC32 'crc32';
     use namespace::clean -except => 'new';
 
-    has $ratio :param = 1;
-    has $description :reader;
+    field $ratio       :param = 1;
+    field $description :reader;
 
     ADJUST {
         # Ensure ratio is a floating point number

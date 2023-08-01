@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: An sampler with a constant result
 
 package OpenTelemetry::SDK::Trace::Sampler::Constant;
@@ -10,8 +10,8 @@ use OpenTelemetry::SDK::Trace::Sampler::Result;
 class OpenTelemetry::SDK::Trace::Sampler::Constant {
     use OpenTelemetry::Trace;
 
-    has $decision    :param;
-    has $description :param :reader;
+    field $decision    :param;
+    field $description :param :reader;
 
     method should_sample (%args) {
         OpenTelemetry::SDK::Trace::Sampler::Result->new(
@@ -32,3 +32,5 @@ use constant {
         description => 'AlwaysOffSampler',
     ),
 };
+
+1;

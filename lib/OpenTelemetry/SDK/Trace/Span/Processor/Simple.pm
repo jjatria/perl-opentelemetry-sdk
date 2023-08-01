@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: A basic OpenTelemetry span processor
 
 package OpenTelemetry::SDK::Trace::Span::Processor::Simple;
@@ -11,7 +11,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SD
     use Future::AsyncAwait;
     use OpenTelemetry::X;
 
-    has $exporter :param;
+    field $exporter :param;
 
     ADJUST {
         die OpenTelemetry::X->create(

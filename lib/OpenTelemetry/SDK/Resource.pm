@@ -1,12 +1,12 @@
-use Object::Pad;
-
-use experimental 'isa';
+use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::SDK::Resource;
 
 our $VERSION = '0.001';
 
 class OpenTelemetry::SDK::Resource {
+    use experimental 'isa';
+
     use OpenTelemetry;
     use OpenTelemetry::Common qw( config validate_attribute_value );
 
@@ -14,11 +14,13 @@ class OpenTelemetry::SDK::Resource {
 
     use namespace::clean -except => 'new';
 
-    has %attributes;
-    has $schema_url :param :reader = '';
+    field %attributes;
+    field $schema_url :param :reader //= '';
 
     ADJUSTPARAMS ( $params ) {
-        my %new = map { split '=', $_, 2 } split ',', config('RESOURCE_ATTRIBUTES') // '';
+        my %new = map split( '=', $_, 2 ),
+            split ',', config('RESOURCE_ATTRIBUTES') // '';
+
         %new = ( %new, %{ delete $params->{attributes} // {} } );
 
         my $logger = OpenTelemetry->logger;

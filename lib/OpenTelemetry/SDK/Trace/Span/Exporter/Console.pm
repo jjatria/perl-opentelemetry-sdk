@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: An OpenTelemetry span exporter that prints to the console
 
 package OpenTelemetry::SDK::Trace::Span::Exporter::Console;
@@ -11,7 +11,7 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
 
     use OpenTelemetry::Constants -trace_export;
 
-    has $stopped;
+    field $stopped;
 
     async method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;

@@ -1,4 +1,4 @@
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: A composite sampler that delegates to parents
 
 package OpenTelemetry::SDK::Trace::Sampler::ParentBased;
@@ -8,18 +8,11 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Sampler::ParentBased {
     use OpenTelemetry::SDK::Trace::Sampler::Constant;
 
-    has $root               :param;
-    has $remote_sampled     :param(remote_parent_sampled    ) = undef;
-    has $remote_not_sampled :param(remote_parent_not_sampled) = undef;
-    has $local_sampled      :param( local_parent_sampled    ) = undef;
-    has $local_not_sampled  :param( local_parent_not_sampled) = undef;
-
-    ADJUST {
-        $remote_sampled     //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_ON;
-        $remote_not_sampled //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_OFF;
-        $local_sampled      //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_ON;
-        $local_not_sampled  //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_OFF;
-    }
+    field $root                      :param;
+    field $remote_parent_sampled     :param //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_ON;
+    field $remote_parent_not_sampled :param //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_OFF;
+    field $local_parent_sampled      :param //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_ON;
+    field $local_parent_not_sampled  :param //= OpenTelemetry::SDK::Trace::Sampler::Constant::ALWAYS_OFF;
 
     method description () {
         sprintf 'ParentBased{'
@@ -30,10 +23,10 @@ class OpenTelemetry::SDK::Trace::Sampler::ParentBased {
         . 'local_parent_not_sampled=%s}',
             map $_->description,
                 $root,
-                $remote_sampled,
-                $remote_not_sampled,
-                $local_sampled,
-                $local_not_sampled;
+                $remote_parent_sampled,
+                $remote_parent_not_sampled,
+                $local_parent_sampled,
+                $local_parent_not_sampled;
     }
 
     method should_sample (%args) {
@@ -43,8 +36,12 @@ class OpenTelemetry::SDK::Trace::Sampler::ParentBased {
         my $delegate = $span_context->valid
             ? $root
             : $span_context->remote
-                ? $trace_flags->sampled ? $remote_sampled : $remote_not_sampled
-                : $trace_flags->sampled ? $local_sampled  : $local_not_sampled;
+                ? $trace_flags->sampled
+                    ? $remote_parent_sampled
+                    : $remote_parent_not_sampled
+                : $trace_flags->sampled
+                    ? $local_parent_sampled
+                    : $local_parent_not_sampled;
 
         $delegate->should_sample(%args);
     }
