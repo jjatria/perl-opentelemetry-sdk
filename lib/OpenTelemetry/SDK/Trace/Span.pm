@@ -42,8 +42,9 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     field @processors;
 
     ADJUSTPARAMS ( $params ) {
-        undef $start if $start && $start > time;
-        $start //= time;
+        my $now = time;
+        undef $start if $start && $start > $now;
+        $start //= $now;
 
         $kind = INTERNAL if $kind < INTERNAL || $kind > CONSUMER;
 
