@@ -122,8 +122,8 @@
          "file" : "lib/OpenTelemetry/SDK/Trace/Span/Processor/Simple.pm",
          "version" : "0.001"
       },
-      "OpenTelemetry::SDK::Trace::Span::Snapshot" : {
-         "file" : "lib/OpenTelemetry/SDK/Trace/Span/Snapshot.pm",
+      "OpenTelemetry::SDK::Trace::Span::Readable" : {
+         "file" : "lib/OpenTelemetry/SDK/Trace/Span/Readable.pm",
          "version" : "0.001"
       },
       "OpenTelemetry::SDK::Trace::SpanLimits" : {

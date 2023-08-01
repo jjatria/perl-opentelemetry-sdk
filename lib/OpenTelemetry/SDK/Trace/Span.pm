@@ -26,6 +26,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;
     use OpenTelemetry::Trace::Span::Status;
+    use OpenTelemetry::SDK::Trace::Span::Readable;
 
     has $end;
     has $kind       :param = INTERNAL;
@@ -149,34 +150,26 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     method snapshot () {
         my $context = $self->context;
 
-        my %snapshot = (
-            attributes                => { %attributes },
-            end_timestamp             => $end,
-            events                    => [ @events ],
-            instrumentation_scope     => $scope->to_string,
-            kind                      => $kind,
-            links                     => [ @links ],
-            name                      => $name,
-            span_id                   => $context->hex_span_id,
-            start_timestamp           => $start,
-            status                    => $status->code,
-            total_recorded_attributes => scalar keys %attributes,
-            total_recorded_events     => scalar @events,
-            total_recorded_links      => scalar @links,
-            trace_flags               => $context->trace_flags->flags,
-            trace_id                  => $context->hex_trace_id,
-            trace_state               => $context->trace_state->to_string,
-        );
-
-        $snapshot{resource} = $resource ? $resource->attributes : {};
-
-        my $span_context = OpenTelemetry::Trace
+        my $parent_span_context = OpenTelemetry::Trace
             ->span_from_context($parent)
             ->context;
 
-        $snapshot{parent_span_id} = $span_context->hex_span_id
-            if $span_context->valid;
+        my $parent_span_id = $parent_span_context->span_id
+            if $parent_span_context->valid;
 
-        \%snapshot;
+        OpenTelemetry::SDK::Trace::Span::Readable->new(
+            attributes            => { %attributes },
+            context               => $context,
+            end_timestamp         => $end,
+            events                => [ @events ],
+            instrumentation_scope => $scope,
+            kind                  => $kind,
+            links                 => [ @links ],
+            name                  => $name,
+            start_timestamp       => $start,
+            status                => $status,
+            resource              => $resource,
+            parent_span_id        => $parent_span_id,
+        );
     }
 }
