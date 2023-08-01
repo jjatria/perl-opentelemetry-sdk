@@ -14,11 +14,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use Future;
     use Mutex;
 
-    use OpenTelemetry::Trace qw(
-        EXPORT_FAILURE
-        EXPORT_TIMEOUT
-        EXPORT_SUCCESS
-    );
+    use OpenTelemetry::Constants -trace_export;
 
     use OpenTelemetry::Common qw( timeout_timestamp maybe_timeout );
     use OpenTelemetry::Propagator::TraceContext::TraceFlags;
@@ -164,13 +160,13 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     async method $atomic_call_on_processors ( $method, $timeout ) {
         my $start = timeout_timestamp;
 
-        my $result = EXPORT_SUCCESS;
+        my $result = TRACE_EXPORT_SUCCESS;
 
         for my $processor ( @span_processors ) {
             my $remaining = maybe_timeout $timeout, $start;
 
             if ( defined $remaining && $remaining == 0 ) {
-                $result = EXPORT_TIMEOUT;
+                $result = TRACE_EXPORT_TIMEOUT;
                 last;
             }
 
@@ -186,7 +182,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     method shutdown ( $timeout = undef ) {
         if ( $stopped ) {
             OpenTelemetry->logger->warn('Attempted to shutdown a TraceProvider more than once');
-            return EXPORT_FAILURE;
+            return TRACE_EXPORT_FAILURE;
         }
 
         $lock->enter(
@@ -197,7 +193,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method force_flush ( $timeout = undef ) {
-        return EXPORT_SUCCESS if $stopped;
+        return TRACE_EXPORT_SUCCESS if $stopped;
 
         $lock->enter(
             sub {

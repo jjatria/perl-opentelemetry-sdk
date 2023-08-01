@@ -2,6 +2,10 @@
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Span';
 
+use OpenTelemetry::Constants qw(
+    SPAN_KIND_INTERNAL
+    SPAN_STATUS_UNSET
+);
 use OpenTelemetry::Trace;
 use OpenTelemetry::SDK::InstrumentationScope;
 
@@ -12,8 +16,8 @@ is CLASS->new( name => 'foo', scope => $scope ), object {
         name                      => 'foo',
         span_id                   => match qr/^[0-9a-z]{16}$/,
         parent_span_id            => DNE,
-        kind                      => 'INTERNAL',
-        status                    => 'UNSET',
+        kind                      => SPAN_KIND_INTERNAL,
+        status                    => SPAN_STATUS_UNSET,
         total_recorded_attributes => 0,
         total_recorded_events     => 0,
         total_recorded_links      => 0,

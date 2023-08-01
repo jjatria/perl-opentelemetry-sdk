@@ -17,6 +17,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use Time::HiRes 'time';
 
     use OpenTelemetry::Common 'validate_attribute_value';
+    use OpenTelemetry::Constants
+        -span_kind => { -as => sub { shift =~ s/^SPAN_KIND_//r } };
 
     use namespace::clean -except => 'new';
 
@@ -26,7 +28,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Trace::Span::Status;
 
     has $end;
-    has $kind       :param = 'INTERNAL'; # TODO: representation?
+    has $kind       :param = INTERNAL;
     has $lock;
     has $name       :param;
     has $parent     :param = undef;
@@ -43,14 +45,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         undef $start if $start && $start > time;
         $start //= time;
 
-        $kind = uc $kind;
-        $kind = 'INTERNAL' unless $kind =~ /^ (:?
-              INTERNAL
-            | CONSUMER
-            | PRODUCER
-            | CLIENT
-            | SERVER
-        ) $/x;
+        $kind = INTERNAL if $kind < INTERNAL || $kind > CONSUMER;
 
         $status = OpenTelemetry::Trace::Span::Status->new;
 
@@ -98,14 +93,14 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     }
 
     method set_status ( $new, $description = undef ) {
-        return $self if !$self->recording || $status->ok;
+        return $self if !$self->recording || $status->is_ok;
 
         my $value = OpenTelemetry::Trace::Span::Status->new(
             code        => $new,
             description => $description // '',
         );
 
-        $status = $value unless $value->unset;
+        $status = $value unless $value->is_unset;
 
         $self;
     }
@@ -164,7 +159,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             name                      => $name,
             span_id                   => $context->hex_span_id,
             start_timestamp           => $start,
-            status                    => $status->to_string,
+            status                    => $status->code,
             total_recorded_attributes => scalar keys %attributes,
             total_recorded_events     => scalar @events,
             total_recorded_links      => scalar @links,
