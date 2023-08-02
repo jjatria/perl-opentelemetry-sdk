@@ -14,6 +14,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use Mutex;
     use Ref::Util qw( is_arrayref is_hashref );
     use Time::HiRes 'time';
+    use Storable 'dclone';
 
     use OpenTelemetry::Common 'validate_attribute_value';
     use OpenTelemetry::Constants
@@ -36,7 +37,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     field $scope      :param;
     field $start      :param = undef;
     field $status            = OpenTelemetry::Trace::Span::Status->unset;
-    field %attributes;
+    field $attributes      //= {};
     field @events;
     field @links;
     field @processors;
@@ -83,7 +84,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
                 'null';
             };
 
-            $attributes{$key} = $value;
+            $attributes->{$key} = $value;
         }
 
         $self;
@@ -154,7 +155,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             if $parent_span_context->valid;
 
         OpenTelemetry::SDK::Trace::Span::Readable->new(
-            attributes            => { %attributes },
+            attributes            => dclone($attributes),
             context               => $context,
             end_timestamp         => $end,
             events                => [ @events ],

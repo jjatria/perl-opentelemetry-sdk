@@ -25,7 +25,7 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
             my $resource = $span->resource;
 
             say STDERR Data::Dumper::Dumper({
-                attributes                => { $span->attributes },
+                attributes                => $span->attributes,
                 end_timestamp             => $span->end_timestamp,
                 events                    => [ $span->events ],
                 instrumentation_scope     => $span->instrumentation_scope->to_string,

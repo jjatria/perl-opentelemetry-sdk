@@ -7,8 +7,9 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::InstrumentationScope {
     use OpenTelemetry;
 
-    field $name    :param;
-    field $version :param //= '';
+    field $name       :param :reader;
+    field $version    :param :reader //= '';
+    field $attributes :param :reader //= {};
 
     ADJUST {
         $name //= do {

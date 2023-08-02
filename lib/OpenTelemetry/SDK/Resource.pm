@@ -14,7 +14,7 @@ class OpenTelemetry::SDK::Resource {
 
     use namespace::clean -except => 'new';
 
-    field %attributes;
+    field $attributes :param         //= {};
     field $schema_url :param :reader //= '';
 
     ADJUSTPARAMS ( $params ) {
@@ -33,11 +33,11 @@ class OpenTelemetry::SDK::Resource {
                 'null';
             };
 
-            $attributes{$key} = $value;
+            $attributes->{$key} = $value;
         }
     }
 
-    method attributes () { dclone \%attributes }
+    method attributes () { dclone $attributes }
 
     method merge ( $new ) {
         return $self unless $new isa OpenTelemetry::SDK::Resource;
