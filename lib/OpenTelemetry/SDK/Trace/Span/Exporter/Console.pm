@@ -36,7 +36,10 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
                 resource                  => $resource ? $resource->attributes : {},
                 span_id                   => $span->hex_span_id,
                 start_timestamp           => $span->start_timestamp,
-                status                    => $span->status->to_hash,
+                status                    => {
+                    code        => $span->status->code,
+                    description => $span->status->description,
+                },
                 total_recorded_attributes => $span->total_recorded_attributes,
                 total_recorded_events     => $span->total_recorded_events,
                 total_recorded_links      => $span->total_recorded_links,
