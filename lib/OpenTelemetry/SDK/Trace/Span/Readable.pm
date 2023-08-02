@@ -36,27 +36,4 @@ class OpenTelemetry::SDK::Trace::Span::Readable {
     method total_recorded_attributes () { scalar keys %$attributes }
 
     method hex_parent_span_id () { unpack 'H*', $parent_span_id }
-
-    method to_hash () {
-        {
-            attributes                => { %$attributes },
-            end_timestamp             => $end_timestamp,
-            events                    => [ @events ],
-            instrumentation_scope     => $instrumentation_scope,
-            kind                      => $kind,
-            links                     => [ @links ],
-            name                      => $name,
-            parent_span_id            => $parent_span_id,
-            resource                  => $resource,
-            span_id                   => $self->span_id,
-            start_timestamp           => $start_timestamp,
-            status                    => $status,
-            total_recorded_attributes => $self->total_recorded_attributes,
-            total_recorded_events     => $self->total_recorded_events,
-            total_recorded_links      => $self->total_recorded_links,
-            trace_flags               => $self->trace_flags,
-            trace_id                  => $self->trace_id,
-            trace_state               => $self->trace_state,
-        }
-    }
 }
