@@ -118,7 +118,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     method add_event (%args) {
         return $self unless $self->recording;
 
-        push @events, OpenTelementry::Trace::Event->new(
+        push @events, OpenTelemetry::Trace::Event->new(
             name       => $args{name},
             timestamp  => $args{timestamp},
             attributes => $args{attributes},
@@ -140,6 +140,18 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         $_->on_end($self) for @processors;
 
         $self;
+    }
+
+    method record_exception ( $exception, %attributes ) {
+        $self->add_event(
+            name       => 'exception',
+            attributes => {
+                'exception.type'       => ref $exception || '',
+                'exception.message'    => "$exception" =~ s/\n.*//r,
+                'exception.stacktrace' => "$exception",
+                %attributes,
+            }
+        );
     }
 
     method recording () { ! defined $end }
