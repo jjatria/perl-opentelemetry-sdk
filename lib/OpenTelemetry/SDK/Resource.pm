@@ -21,6 +21,11 @@ class OpenTelemetry::SDK::Resource {
         my %new = map split( '=', $_, 2 ),
             split ',', config('RESOURCE_ATTRIBUTES') // '';
 
+        $new{'service.name'} = config('SERVICE_NAME') // 'unknown_service';
+        $new{'telemetry.sdk.name'} = 'opentelemetry';
+        $new{'telemetry.sdk.language'} = 'perl';
+        $new{'telemetry.sdk.version'} = $OpenTelemetry::SDK::VERSION;
+
         %new = ( %new, %{ delete $params->{attributes} // {} } );
 
         my $logger = OpenTelemetry->logger;

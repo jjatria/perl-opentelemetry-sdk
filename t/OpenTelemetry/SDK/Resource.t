@@ -2,29 +2,43 @@
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Resource';
 
+require OpenTelemetry::SDK;
+
 local %ENV;
+
+my %default = (
+    'service.name'           => 'unknown_service',
+    'telemetry.sdk.name'     => 'opentelemetry',
+    'telemetry.sdk.language' => 'perl',
+    'telemetry.sdk.version'  => $OpenTelemetry::SDK::VERSION,
+);
 
 subtest New => sub {
     is CLASS->new( schema_url => 'foo', attributes => { key => 'value' } ), object {
         call schema_url => 'foo';
-        call attributes => { key => 'value' };
+        call attributes => { key => 'value', %default };
     }, 'Arguments to constructor';
 
     subtest 'Empty environment' => sub {
         is CLASS->new, object {
             call schema_url => '';
-            call attributes => {};
-        }, 'No attributes';
+            call attributes => \%default;
+        }, 'Only default attributes';
     };
 
     subtest 'Empty environment' => sub {
-        local %ENV = ( OTEL_RESOURCE_ATTRIBUTES => 'key1=value1,key2=value2' );
+        local %ENV = (
+            OTEL_RESOURCE_ATTRIBUTES => 'key1=value1,key2=value2',
+            OTEL_SERVICE_NAME        => 'some_service',
+        );
 
         is CLASS->new, object {
             call schema_url => '';
             call attributes => {
-                key1 => 'value1',
-                key2 => 'value2',
+                %default,
+                'key1'         => 'value1',
+                'key2'         => 'value2',
+                'service.name' => 'some_service',
             };
         }, 'Attributes from environment';
     };
@@ -36,7 +50,7 @@ subtest 'Attributes are not mutable' => sub {
     push @{ $data->{ref} }, 'test';
 
     is $new, object {
-        call attributes => { ref => [ 1 ] };
+        call attributes => { %default, ref => [ 1 ] };
     }, 'Did not change';
 };
 
@@ -47,22 +61,22 @@ subtest 'Merge' => sub {
 
     is $foo->merge($bar), object {
         call schema_url => 'foo';
-        call attributes => { a => 1, b => 2, c => 2 };
+        call attributes => { %default, a => 1, b => 2, c => 2 };
     }, 'Prefer new but keep schema URL when mismatched';
 
     is $bar->merge($foo), object {
         call schema_url => 'bar';
-        call attributes => { a => 1, b => 1, c => 2 };
+        call attributes => { %default, a => 1, b => 1, c => 2 };
     }, 'Confirm preference';
 
     is $non->merge($foo), object {
         call schema_url => 'foo';
-        call attributes => { a => 1, b => 1 };
+        call attributes => { %default, a => 1, b => 1 };
     }, 'No schema URL is updated';
 
     is $foo->merge($non), object {
         call schema_url => 'foo';
-        call attributes => { a => 1, b => 1 };
+        call attributes => { %default, a => 1, b => 1 };
     }, 'Existing schema URL stays if new is unset';
 };
 
