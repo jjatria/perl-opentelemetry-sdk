@@ -13,6 +13,24 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
 
     field $stopped;
 
+    my sub dump_event ($event) {
+        {
+            timestamp          => $event->timestamp,
+            name               => $event->name,
+            attributes         => $event->attributes,
+            dropped_attributes => 0,
+        }
+    }
+
+    my sub dump_link ($link) {
+        {
+            trace_id           => $link->context->trace_id,
+            span_id            => $link->context->span_id,
+            attributes         => $link->attributes,
+            dropped_attributes => 0,
+        }
+    }
+
     async method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;
 
@@ -27,10 +45,10 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
             say STDERR Data::Dumper::Dumper({
                 attributes                => $span->attributes,
                 end_timestamp             => $span->end_timestamp,
-                events                    => [ $span->events ],
+                events                    => [ map dump_event($_), $span->events ],
                 instrumentation_scope     => $span->instrumentation_scope->to_string,
                 kind                      => $span->kind,
-                links                     => [ $span->links ],
+                links                     => [ map dump_link($_), $span->links ],
                 name                      => $span->name,
                 parent_span_id            => $span->hex_parent_span_id,
                 resource                  => $resource ? $resource->attributes : {},
