@@ -7,10 +7,17 @@ require OpenTelemetry::SDK;
 local %ENV;
 
 my %default = (
-    'service.name'           => 'unknown_service',
-    'telemetry.sdk.name'     => 'opentelemetry',
-    'telemetry.sdk.language' => 'perl',
-    'telemetry.sdk.version'  => $OpenTelemetry::SDK::VERSION,
+    'service.name'            => 'unknown_service',
+    'telemetry.sdk.name'      => 'opentelemetry',
+    'telemetry.sdk.language'  => 'perl',
+    'telemetry.sdk.version'   => $OpenTelemetry::SDK::VERSION,
+    'process.pid'             => $$,
+    'process.command'         => $0,
+    'process.executable.path' => $^X,
+    'process.command_args'    => T,
+    'process.executable.name' => T,
+    'process.runtime.name'    => 'perl',
+    'process.runtime.version' => "$^V",
 );
 
 subtest New => sub {

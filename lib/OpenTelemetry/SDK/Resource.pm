@@ -9,7 +9,7 @@ class OpenTelemetry::SDK::Resource {
 
     use OpenTelemetry;
     use OpenTelemetry::Common qw( config validate_attribute_value );
-
+    use File::Basename 'basename';
     use Storable 'dclone';
 
     use namespace::clean -except => 'new';
@@ -21,10 +21,19 @@ class OpenTelemetry::SDK::Resource {
         my %new = map split( '=', $_, 2 ),
             split ',', config('RESOURCE_ATTRIBUTES') // '';
 
-        $new{'service.name'} = config('SERVICE_NAME') // 'unknown_service';
-        $new{'telemetry.sdk.name'} = 'opentelemetry';
-        $new{'telemetry.sdk.language'} = 'perl';
-        $new{'telemetry.sdk.version'} = $OpenTelemetry::SDK::VERSION;
+        # TODO: Should these be split / moved somewhere else?
+        # How are they overidden?
+        $new{'service.name'}            = config('SERVICE_NAME') // 'unknown_service';
+        $new{'telemetry.sdk.name'}      = 'opentelemetry';
+        $new{'telemetry.sdk.language'}  = 'perl';
+        $new{'telemetry.sdk.version'}   = $OpenTelemetry::SDK::VERSION;
+        $new{'process.pid'}             = $$;
+        $new{'process.command'}         = $0;
+        $new{'process.executable.path'} = $^X;
+        $new{'process.command_args'}    = [ @ARGV ],
+        $new{'process.executable.name'} = basename $^X;
+        $new{'process.runtime.name'}    = 'perl';
+        $new{'process.runtime.version'} = "$^V";
 
         %new = ( %new, %{ delete $params->{attributes} // {} } );
 
