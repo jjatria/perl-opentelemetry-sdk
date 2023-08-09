@@ -4,6 +4,7 @@ use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Sampler::ParentBased';
 
 use OpenTelemetry::Context;
 use OpenTelemetry::Trace;
+use Syntax::Keyword::Dynamically;
 
 is CLASS->new( root => mock(obj => add => [ description => 'RootSampler' ]) )
     ->description,
@@ -50,9 +51,8 @@ for (
         },
     ];
 
-    my $token = OpenTelemetry::Context->attach(
-        my $context = OpenTelemetry::Trace->context_with_span($span)
-    );
+    my $context = OpenTelemetry::Trace->context_with_span($span);
+    dynamically OpenTelemetry::Context->current = $context;
 
     is $test->should_sample( context => $context ), $want,
         sprintf 'Used %s when %s, %s, and %s',
@@ -60,8 +60,6 @@ for (
         $valid   ? 'valid'   : 'not valid',
         $remote  ? 'remote'  : 'local',
         $sampled ? 'sampled' : 'not sampled';
-
-    OpenTelemetry::Context->detach($token);
 }
 
 done_testing;

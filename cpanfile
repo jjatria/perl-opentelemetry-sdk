@@ -9,5 +9,6 @@ requires 'String::CRC32';
 requires 'namespace::clean';
 
 on test => sub {
+    requires 'Syntax::Keyword::Dynamically';
     requires 'Test2::V0';
 };

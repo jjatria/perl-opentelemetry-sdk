@@ -60,6 +60,7 @@
          "requires" : {
             "ExtUtils::MakeMaker" : "0",
             "File::Spec" : "0",
+            "Syntax::Keyword::Dynamically" : "0",
             "Test2::V0" : "0",
             "Test::More" : "0",
             "perl" : "v5.32.0"
