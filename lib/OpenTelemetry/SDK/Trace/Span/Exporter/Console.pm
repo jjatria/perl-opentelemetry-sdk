@@ -31,6 +31,13 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
         }
     }
 
+    my sub dump_status ($status) {
+        {
+            code        => $status->code,
+            description => $status->description,
+        }
+    }
+
     async method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;
 
@@ -54,10 +61,7 @@ class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SD
                 resource                  => $resource ? $resource->attributes : {},
                 span_id                   => $span->hex_span_id,
                 start_timestamp           => $span->start_timestamp,
-                status                    => {
-                    code        => $span->status->code,
-                    description => $span->status->description,
-                },
+                status                    => dump_status($span->status),
                 total_recorded_attributes => $span->total_recorded_attributes,
                 total_recorded_events     => $span->total_recorded_events,
                 total_recorded_links      => $span->total_recorded_links,
