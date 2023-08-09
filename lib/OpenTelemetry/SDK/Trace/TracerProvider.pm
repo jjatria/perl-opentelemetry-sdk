@@ -83,32 +83,27 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method $create_span (%args) {
-        my %span = %args{qw( name parent kind start scope )};
+        my %span = %args{qw( name kind start scope links )};
 
-        my ( $trace_id, $parent_span_id );
-        {
-            my $parent = OpenTelemetry::Trace
-                ->span_from_context( $args{parent} )->context;
+        $span{parent} = OpenTelemetry::Trace
+            ->span_from_context( $args{parent} )->context;
 
-            if ( $parent->valid ) {
-                $parent_span_id = $parent->span_id;
-                $trace_id       = $parent->trace_id;
-            }
-        }
-
-        $trace_id //= $id_generator->generate_trace_id;
-        my $span_id = $id_generator->generate_span_id;
+        my $trace_id = $span{parent}->valid
+            ? $span{parent}->trace_id
+            : $id_generator->generate_trace_id;
 
         my $result = $sampler->should_sample(
-            trace_id   => $span{trace_id},
+            trace_id   => $trace_id,
             context    => $args{parent},
-            name       => $args{name},
-            kind       => $args{kind},
+            name       => $span{name},
+            kind       => $span{kind},
             attributes => $args{attributes},
-            links      => $args{links},
+            links      => $span{links},
         );
 
         $span{attributes} = { %{ $args{attributes} // {} }, %{ $result->attributes } };
+
+        my $span_id = $id_generator->generate_span_id;
 
         if ( $result->recording && !$stopped ) {
             my $flags = $result->sampled

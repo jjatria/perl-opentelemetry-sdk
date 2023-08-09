@@ -22,17 +22,18 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
 
     use namespace::clean -except => 'new';
 
-    use OpenTelemetry::Trace;
+    use OpenTelemetry::SDK::Trace::Span::Readable;
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;
+    use OpenTelemetry::Trace::SpanContext;
     use OpenTelemetry::Trace::Span::Status;
-    use OpenTelemetry::SDK::Trace::Span::Readable;
+    use OpenTelemetry::Trace;
 
     field $end;
     field $kind       :param = INTERNAL;
     field $lock              = Mutex->new;
     field $name       :param;
-    field $parent     :param = undef;
+    field $parent     :param = OpenTelemetry::Trace::SpanContext::INVALID;
     field $resource   :param = undef;
     field $scope      :param;
     field $start      :param = undef;
@@ -157,18 +158,9 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     method recording () { ! defined $end }
 
     method snapshot () {
-        my $context = $self->context;
-
-        my $parent_span_context = OpenTelemetry::Trace
-            ->span_from_context($parent)
-            ->context;
-
-        my $parent_span_id = $parent_span_context->span_id
-            if $parent_span_context->valid;
-
         OpenTelemetry::SDK::Trace::Span::Readable->new(
             attributes            => dclone($attributes),
-            context               => $context,
+            context               => $self->context,
             end_timestamp         => $end,
             events                => [ @events ],
             instrumentation_scope => $scope,
@@ -178,7 +170,7 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             start_timestamp       => $start,
             status                => $status,
             resource              => $resource,
-            parent_span_id        => $parent_span_id,
+            parent_span_id        => $parent->span_id,
         );
     }
 }
