@@ -133,10 +133,20 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method tracer ( %args ) {
-        OpenTelemetry->logger->warnf('Got invalid tracer name when retrieving tracer: %s', $args{name})
+        # If no name is provided, we get it from the caller
+        # This has to override the version, since the version
+        # only makes sense for the package
+        $args{name} || do {
+            ( $args{name} ) = caller;
+            $args{version}  = $args{name}->VERSION;
+        };
+
+        OpenTelemetry->logger
+            ->warnf('Got invalid tracer name when retrieving tracer: %s', $args{name})
             unless $args{name};
 
-        my $scope = OpenTelemetry::SDK::InstrumentationScope->new( %args{qw( name version )} );
+        my $scope = OpenTelemetry::SDK::InstrumentationScope
+            ->new( %args{qw( name version )} );
 
         $registry_lock->enter( sub {
             $registry{ $scope->to_string } //= OpenTelemetry::SDK::Trace::Tracer->new(
