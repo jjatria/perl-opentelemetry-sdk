@@ -1,3 +1,4 @@
+requires 'Feature::Compat::Try';
 requires 'Future', '0.26';             # Future->done
 requires 'Future::AsyncAwait', '0.38'; # Object::Pad compatibility
 requires 'Metrics::Any';

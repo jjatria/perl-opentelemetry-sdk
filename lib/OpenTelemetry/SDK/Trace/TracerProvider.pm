@@ -8,8 +8,7 @@ our $VERSION = '0.001';
 use OpenTelemetry;
 
 class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::TracerProvider) {
-    use experimental 'try';
-
+    use Feature::Compat::Try;
     use Future::AsyncAwait;
     use Future;
     use Mutex;
@@ -38,8 +37,6 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     field $registry_lock //= Mutex->new;
 
     ADJUST {
-        return if $sampler;
-
         try {
             for ( $ENV{OTEL_TRACES_SAMPLER} // 'parentbased_always_on' ) {
                 $sampler //= OpenTelemetry::SDK::Trace::Sampler::ALWAYS_ON  if $_ eq 'always_on';

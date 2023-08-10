@@ -5,10 +5,11 @@ our $VERSION = '0.001';
 
 use strict;
 use warnings;
-use experimental qw( try signatures lexical_subs );
+use experimental qw( signatures lexical_subs );
 use feature 'state';
 
 use Module::Runtime 'require_module';
+use Feature::Compat::Try;
 use OpenTelemetry::Common 'config';
 use OpenTelemetry::Propagator::Composite;
 use OpenTelemetry::SDK::Trace::TracerProvider;
