@@ -48,7 +48,6 @@
             "Mutex" : "0",
             "Object::Pad" : "0.74",
             "OpenTelemetry" : "0",
-            "Storable" : "0",
             "String::CRC32" : "0",
             "perl" : "v5.32.0"
          }

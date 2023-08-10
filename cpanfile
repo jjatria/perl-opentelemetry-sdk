@@ -5,7 +5,6 @@ requires 'Metrics::Any';
 requires 'Mutex';
 requires 'Object::Pad', '0.74'; # For //= field initialisers
 requires 'OpenTelemetry';
-requires 'Storable';
 requires 'String::CRC32';
 
 on test => sub {
