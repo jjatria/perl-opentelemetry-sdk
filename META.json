@@ -72,10 +72,6 @@
          "file" : "lib/OpenTelemetry/SDK.pm",
          "version" : "0.001"
       },
-      "OpenTelemetry::SDK::Configurator" : {
-         "file" : "lib/OpenTelemetry/SDK/Configurator.pm",
-         "version" : "0.001"
-      },
       "OpenTelemetry::SDK::InstrumentationScope" : {
          "file" : "lib/OpenTelemetry/SDK/InstrumentationScope.pm",
          "version" : "0.001"
