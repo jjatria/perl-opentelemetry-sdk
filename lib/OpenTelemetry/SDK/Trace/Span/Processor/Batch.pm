@@ -17,8 +17,6 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch :does(OpenTelemetry::SDK
     use Metrics::Any '$metrics', strict => 0;
     my $logger = OpenTelemetry->logger;
 
-    use namespace::clean -except => 'new';
-
     field $batch_size       :param //= config('BSP_MAX_EXPORT_BATCH_SIZE') //    512;
     field $exporter_timeout :param //= config('BSP_EXPORT_TIMEOUT')        // 30_000;
     field $max_queue_size   :param //= config('BSP_MAX_QUEUE_SIZE')        //  2_048;

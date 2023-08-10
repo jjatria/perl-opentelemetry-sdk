@@ -9,7 +9,6 @@ use OpenTelemetry::SDK::Trace::Sampler::Result;
 
 class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased {
     use String::CRC32 'crc32';
-    use namespace::clean -except => 'new';
 
     field $ratio       :param = 1;
     field $description :reader;

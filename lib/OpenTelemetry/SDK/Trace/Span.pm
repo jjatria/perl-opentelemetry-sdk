@@ -20,8 +20,6 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Constants
         -span_kind => { -as => sub { shift =~ s/^SPAN_KIND_//r } };
 
-    use namespace::clean -except => 'new';
-
     use OpenTelemetry::SDK::Trace::Span::Readable;
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;

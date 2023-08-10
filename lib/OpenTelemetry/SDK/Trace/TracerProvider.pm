@@ -26,8 +26,6 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::Trace::SpanContext;
 
-    use namespace::clean -except => 'new';
-
     field $sampler      :param = undef;
     field $id_generator :param = 'OpenTelemetry::Trace';
     field $span_limits  :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;

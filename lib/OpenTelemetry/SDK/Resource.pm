@@ -12,8 +12,6 @@ class OpenTelemetry::SDK::Resource {
     use File::Basename 'basename';
     use Storable 'dclone';
 
-    use namespace::clean -except => 'new';
-
     field $attributes :param         //= {};
     field $schema_url :param :reader //= '';
 

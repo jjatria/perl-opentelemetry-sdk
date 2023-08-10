@@ -11,8 +11,6 @@ class OpenTelemetry::SDK::Trace::SpanLimits {
     use Carp 'croak';
     use OpenTelemetry::Common 'config';
 
-    use namespace::clean -except => 'new';
-
     field $attribute_count_limit        :reader = config(qw( SPAN_ATTRIBUTE_COUNT_LIMIT          ATTRIBUTE_COUNT_LIMIT        )) // 128;
     field $attribute_length_limit       :reader = config(qw( SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT   ATTRIBUTE_VALUE_LENGTH_LIMIT ));
     field $event_attribute_count_limit  :reader = config(qw( EVENT_ATTRIBUTE_VALUE_COUNT_LIMIT   ATTRIBUTE_COUNT_LIMIT        )) // 128;
