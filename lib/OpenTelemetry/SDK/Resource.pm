@@ -4,67 +4,50 @@ package OpenTelemetry::SDK::Resource;
 
 our $VERSION = '0.001';
 
-class OpenTelemetry::SDK::Resource {
-    use experimental 'isa';
+class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
+     use experimental 'isa';
 
-    use OpenTelemetry;
-    use OpenTelemetry::Common qw( config validate_attribute_value );
-    use File::Basename 'basename';
-    use Storable 'dclone';
+     use OpenTelemetry;
+     use OpenTelemetry::Common 'config';
+     use File::Basename 'basename';
 
-    field $attributes :param         //= {};
-    field $schema_url :param :reader //= '';
+     field $schema_url :param :reader //= '';
 
-    ADJUSTPARAMS ( $params ) {
-        my %new = map split( '=', $_, 2 ),
-            split ',', config('RESOURCE_ATTRIBUTES') // '';
+     ADJUSTPARAMS ( $params ) {
+         my %new = map split( '=', $_, 2 ),
+             split ',', config('RESOURCE_ATTRIBUTES') // '';
 
-        # TODO: Should these be split / moved somewhere else?
-        # How are they overidden?
-        $new{'service.name'}            = config('SERVICE_NAME') // 'unknown_service';
-        $new{'telemetry.sdk.name'}      = 'opentelemetry';
-        $new{'telemetry.sdk.language'}  = 'perl';
-        $new{'telemetry.sdk.version'}   = $OpenTelemetry::SDK::VERSION;
-        $new{'process.pid'}             = $$;
-        $new{'process.command'}         = $0;
-        $new{'process.executable.path'} = $^X;
-        $new{'process.command_args'}    = [ @ARGV ],
-        $new{'process.executable.name'} = basename $^X;
-        $new{'process.runtime.name'}    = 'perl';
-        $new{'process.runtime.version'} = "$^V";
+         # TODO: Should these be split / moved somewhere else?
+         # How are they overidden?
+         $new{'service.name'}            = config('SERVICE_NAME') // 'unknown_service';
+         $new{'telemetry.sdk.name'}      = 'opentelemetry';
+         $new{'telemetry.sdk.language'}  = 'perl';
+         $new{'telemetry.sdk.version'}   = $OpenTelemetry::SDK::VERSION;
+         $new{'process.pid'}             = $$;
+         $new{'process.command'}         = $0;
+         $new{'process.executable.path'} = $^X;
+         $new{'process.command_args'}    = [ @ARGV ],
+         $new{'process.executable.name'} = basename $^X;
+         $new{'process.runtime.name'}    = 'perl';
+         $new{'process.runtime.version'} = "$^V";
 
-        %new = ( %new, %{ delete $params->{attributes} // {} } );
+        $self->_set_attribute(%new);
+     }
 
-        my $logger = OpenTelemetry->logger;
-        for my $key ( keys %new ) {
-            my $value = $new{$key};
-            next unless validate_attribute_value $value;
+     method merge ( $new ) {
+         return $self unless $new isa OpenTelemetry::SDK::Resource;
 
-            $key ||= do {
-                $logger->warnf("Resource attribute names should not be empty. Setting to 'null' instead");
-                'null';
-            };
+         my $ours   = $self->schema_url;
+         my $theirs = $new->schema_url;
 
-            $attributes->{$key} = $value;
-        }
-    }
+         if ( $ours && $theirs && $ours ne $theirs ) {
+             OpenTelemetry->logger->warnf("Incompatible resource schema URLs in call to merge. Keeping existing one: '%s'", $ours);
+             $theirs = '';
+         }
 
-    method attributes () { dclone $attributes }
-
-    method merge ( $new ) {
-        return $self unless $new isa OpenTelemetry::SDK::Resource;
-
-        my $ours   = $self->schema_url;
-        my $theirs = $new->schema_url;
-
-        if ( $ours && $theirs && $ours ne $theirs ) {
-            OpenTelemetry->logger->warnf("Incompatible resource schema URLs in call to merge. Keeping existing one: '%s'", $ours);
-            $theirs = '';
-        }
-
-        ( ref $self )->new(
-            attributes => { %{ $self->attributes }, %{ $new->attributes } },
-            schema_url => $theirs || $ours,
-        );
-    }
+         ( ref $self )->new(
+             attributes => { %{ $self->attributes }, %{ $new->attributes } },
+             schema_url => $theirs || $ours,
+         );
+     }
 }

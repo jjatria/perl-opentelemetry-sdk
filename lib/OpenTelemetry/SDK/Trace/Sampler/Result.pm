@@ -11,9 +11,8 @@ use constant {
     DROP              => 'DROP',
 };
 
-class OpenTelemetry::SDK::Trace::Sampler::Result {
+class OpenTelemetry::SDK::Trace::Sampler::Result :does(OpenTelemetry::Attributes) {
     field $trace_state :param :reader;
-    field $attributes  :param :reader //= {};
     field $decision    :param;
 
     method sampled () { $decision eq RECORD_AND_SAMPLE }

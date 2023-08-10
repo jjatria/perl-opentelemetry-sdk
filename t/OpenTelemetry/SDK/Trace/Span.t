@@ -19,27 +19,27 @@ my $scope = OpenTelemetry::SDK::InstrumentationScope->new( name => 'test' );
 is CLASS->new( name => 'foo', scope => $scope ), object {
     call snapshot => object {
         prop isa => 'OpenTelemetry::SDK::Trace::Span::Readable';
-        call attributes                => {};
-        call end_timestamp             => U;
-        call_list events               => [];
-        call instrumentation_scope     => object { call to_string => '[test:]' };
-        call kind                      => SPAN_KIND_INTERNAL;
-        call_list links                => [];
-        call name                      => 'foo';
-        call parent_span_id            => INVALID_SPAN_ID;
-        call resource                  => U;
-        call span_id                   => validator(sub { length == 8 });
-        call start_timestamp           => T;
-        call status                    => object {
+        call attributes            => {};
+        call end_timestamp         => U;
+        call_list events           => [];
+        call instrumentation_scope => object { call to_string => '[test:]' };
+        call kind                  => SPAN_KIND_INTERNAL;
+        call_list links            => [];
+        call name                  => 'foo';
+        call parent_span_id        => INVALID_SPAN_ID;
+        call resource              => U;
+        call span_id               => validator(sub { length == 8 });
+        call start_timestamp       => T;
+        call recorded_attributes   => 0;
+        call recorded_events       => 0;
+        call recorded_links        => 0;
+        call trace_flags           => object { call flags => 0 };
+        call trace_id              => validator(sub { length == 16 });
+        call trace_state           => object { call to_string => '' };
+        call status => object {
            call code        => SPAN_STATUS_UNSET;
            call description => '';
         };
-        call total_recorded_attributes => 0;
-        call total_recorded_events     => 0;
-        call total_recorded_links      => 0;
-        call trace_flags               => object { call flags => 0 };
-        call trace_id                  => validator(sub { length == 16 });
-        call trace_state               => object { call to_string => '' };
     };
 }, 'Can create readable snapshot';
 

@@ -83,6 +83,9 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     method $create_span (%args) {
         my %span = %args{qw( name kind start scope links )};
 
+        $span{attribute_count_limit}  = $span_limits->attribute_count_limit;
+        $span{attribute_length_limit} = $span_limits->attribute_length_limit;
+
         $span{parent} = OpenTelemetry::Trace
             ->span_from_context( $args{parent} )->context;
 
@@ -99,7 +102,10 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
             links      => $span{links},
         );
 
-        $span{attributes} = { %{ $args{attributes} // {} }, %{ $result->attributes } };
+        $span{attributes} = {
+            %{ $args{attributes} // {} },
+            %{ $result->attributes },
+        };
 
         my $span_id = $id_generator->generate_span_id;
 

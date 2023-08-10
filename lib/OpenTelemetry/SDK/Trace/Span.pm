@@ -9,17 +9,19 @@ our $VERSION = '0.001';
 use OpenTelemetry;
 my $logger = OpenTelemetry->logger;
 
-class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
+class OpenTelemetry::SDK::Trace::Span
+    :isa(OpenTelemetry::Trace::Span)
+    :does(OpenTelemetry::Attributes)
+{
     use List::Util qw( any pairs );
     use Mutex;
     use Ref::Util qw( is_arrayref is_hashref );
     use Time::HiRes 'time';
-    use Storable 'dclone';
 
-    use OpenTelemetry::Common 'validate_attribute_value';
     use OpenTelemetry::Constants
         -span_kind => { -as => sub { shift =~ s/^SPAN_KIND_//r } };
 
+    use OpenTelemetry::SDK::Trace::SpanLimits;
     use OpenTelemetry::SDK::Trace::Span::Readable;
     use OpenTelemetry::Trace::Event;
     use OpenTelemetry::Trace::Link;
@@ -27,16 +29,18 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     use OpenTelemetry::Trace::Span::Status;
     use OpenTelemetry::Trace;
 
+    field $dropped_events      = 0;
+    field $dropped_links       = 0;
     field $end;
-    field $kind       :param = INTERNAL;
-    field $lock              = Mutex->new;
+    field $kind       :param   = INTERNAL;
+    field $limits     :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
+    field $lock                = Mutex->new;
     field $name       :param;
-    field $parent     :param = OpenTelemetry::Trace::SpanContext::INVALID;
-    field $resource   :param = undef;
+    field $parent     :param   = OpenTelemetry::Trace::SpanContext::INVALID;
+    field $resource   :param   = undef;
     field $scope      :param;
-    field $start      :param = undef;
-    field $status            = OpenTelemetry::Trace::Span::Status->unset;
-    field $attributes      //= {};
+    field $start      :param   = undef;
+    field $status              = OpenTelemetry::Trace::Span::Status->unset;
     field @events;
     field @links;
     field @processors;
@@ -55,8 +59,6 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
                 ? push( @links, $link )
                 : $self->add_link(%$link);
         }
-
-        $self->set_attribute( %{ delete $params->{attributes} // {} } );
     }
 
     method set_name ( $new ) {
@@ -73,20 +75,8 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
             return $self
         }
 
-        for my $pair ( pairs %new ) {
-            my ( $key, $value ) = @$pair;
-
-            next unless validate_attribute_value $value;
-
-            $key ||= do {
-                $logger->warnf("Span attribute names should not be empty. Setting to 'null' instead");
-                'null';
-            };
-
-            $attributes->{$key} = $value;
-        }
-
-        $self;
+        # FIXME: Ideally an overridable method from role, but that is not supported
+        $self->_set_attribute( %new );
     }
 
     method set_status ( $new, $description = undef ) {
@@ -106,9 +96,17 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
         return $self unless $self->recording
             && $args{context} isa OpenTelemetry::Trace::SpanContext;
 
+        if ( scalar @links >= $limits->link_count_limit ) {
+            $dropped_links++;
+            $logger->warn('Dropped link because it would exceed specified limit');
+            return $self;
+        }
+
         push @links, OpenTelemetry::Trace::Link->new(
-            context    => $args{context},
-            attributes => $args{attributes},
+            context                => $args{context},
+            attributes             => $args{attributes},
+            attribute_count_limit  => $limits->link_attribute_count_limit,
+            attribute_length_limit => $limits->link_attribute_length_limit,
         );
 
         $self;
@@ -117,10 +115,18 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
     method add_event (%args) {
         return $self unless $self->recording;
 
+        if ( scalar @events >= $limits->event_count_limit ) {
+            $dropped_events++;
+            $logger->warn('Dropped event because it would exceed specified limit');
+            return $self;
+        }
+
         push @events, OpenTelemetry::Trace::Event->new(
-            name       => $args{name},
-            timestamp  => $args{timestamp},
-            attributes => $args{attributes},
+            name                   => $args{name},
+            timestamp              => $args{timestamp},
+            attributes             => $args{attributes},
+            attribute_count_limit  => $limits->event_attribute_count_limit,
+            attribute_length_limit => $limits->event_attribute_length_limit,
         );
 
         $self;
@@ -157,18 +163,20 @@ class OpenTelemetry::SDK::Trace::Span :isa(OpenTelemetry::Trace::Span) {
 
     method snapshot () {
         OpenTelemetry::SDK::Trace::Span::Readable->new(
-            attributes            => dclone($attributes),
+            attributes            => $self->attributes,
             context               => $self->context,
+            dropped_events        => $dropped_events,
+            dropped_links         => $dropped_links,
             end_timestamp         => $end,
             events                => [ @events ],
             instrumentation_scope => $scope,
             kind                  => $kind,
             links                 => [ @links ],
             name                  => $name,
+            parent_span_id        => $parent->span_id,
+            resource              => $resource,
             start_timestamp       => $start,
             status                => $status,
-            resource              => $resource,
-            parent_span_id        => $parent->span_id,
         );
     }
 }
