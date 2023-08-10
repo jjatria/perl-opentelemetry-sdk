@@ -1,7 +1,5 @@
 use Object::Pad ':experimental(init_expr)';
 
-use feature 'isa';
-
 package OpenTelemetry::SDK::Trace::Span;
 
 our $VERSION = '0.001';
@@ -13,6 +11,8 @@ class OpenTelemetry::SDK::Trace::Span
     :isa(OpenTelemetry::Trace::Span)
     :does(OpenTelemetry::Attributes)
 {
+    use experimental 'isa';
+
     use List::Util qw( any pairs );
     use Mutex;
     use Ref::Util qw( is_arrayref is_hashref );
