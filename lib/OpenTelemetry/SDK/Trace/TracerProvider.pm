@@ -114,6 +114,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
                 trace_id    => $trace_id,
                 span_id     => $span_id,
                 trace_flags => $flags,
+                trace_state => $result->trace_state,
             );
 
             $span{context}    = $context;
