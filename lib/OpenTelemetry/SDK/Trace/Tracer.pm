@@ -7,6 +7,8 @@ our $VERSION = '0.001';
 
 class OpenTelemetry::SDK::Trace::Tracer :isa(OpenTelemetry::Trace::Tracer) {
     use OpenTelemetry::Constants 'SPAN_KIND_INTERNAL';
+    use OpenTelemetry::Context;
+    use OpenTelemetry::Trace;
 
     field $name         :param;
     field $version      :param;
@@ -18,6 +20,9 @@ class OpenTelemetry::SDK::Trace::Tracer :isa(OpenTelemetry::Trace::Tracer) {
 
         $args{context} = OpenTelemetry::Context->current
             unless exists $args{context};
+
+        return $self->SUPER::create_span(%args)
+            if OpenTelemetry::Trace->is_untraced_context($args{context});
 
         $span_creator->(%args);
     }
