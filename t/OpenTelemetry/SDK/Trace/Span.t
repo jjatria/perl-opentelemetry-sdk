@@ -30,9 +30,9 @@ is CLASS->new( name => 'foo', scope => $scope ), object {
         call resource              => U;
         call span_id               => validator(sub { length == 8 });
         call start_timestamp       => T;
-        call recorded_attributes   => 0;
-        call recorded_events       => 0;
-        call recorded_links        => 0;
+        call dropped_attributes    => 0;
+        call dropped_events        => 0;
+        call dropped_links         => 0;
         call trace_flags           => object { call flags => 0 };
         call trace_id              => validator(sub { length == 16 });
         call trace_state           => object { call to_string => '' };

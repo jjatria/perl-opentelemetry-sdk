@@ -33,8 +33,5 @@ class OpenTelemetry::SDK::Trace::Span::Readable :does(OpenTelemetry::Attributes)
     method     span_id     () { $context->span_id      }
     method hex_span_id     () { $context->hex_span_id  }
 
-    method recorded_events () { scalar @events + $dropped_events }
-    method recorded_links  () { scalar @links  + $dropped_links  }
-
     method hex_parent_span_id () { unpack 'H*', $parent_span_id }
 }
