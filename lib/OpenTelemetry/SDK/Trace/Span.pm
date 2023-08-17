@@ -7,9 +7,11 @@ our $VERSION = '0.001';
 use OpenTelemetry;
 my $logger = OpenTelemetry->logger;
 
+use OpenTelemetry::Attributes;
+
 class OpenTelemetry::SDK::Trace::Span
     :isa(OpenTelemetry::Trace::Span)
-    :does(OpenTelemetry::Attributes)
+    :does(OpenTelemetry::Attributes::Writable)
 {
     use experimental 'isa';
 
