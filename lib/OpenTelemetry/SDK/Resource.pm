@@ -11,6 +11,8 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
      use OpenTelemetry::Common 'config';
      use File::Basename 'basename';
 
+     require OpenTelemetry::SDK; # For VERSION
+
      field $schema_url :param :reader //= '';
 
      ADJUSTPARAMS ( $params ) {
