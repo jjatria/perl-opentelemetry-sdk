@@ -10,8 +10,6 @@ class OpenTelemetry::SDK::Trace::Tracer :isa(OpenTelemetry::Trace::Tracer) {
     use OpenTelemetry::Context;
     use OpenTelemetry::Trace;
 
-    field $name         :param;
-    field $version      :param;
     field $span_creator :param;
 
     method create_span ( %args ) {

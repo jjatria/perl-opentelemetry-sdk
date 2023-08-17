@@ -25,6 +25,8 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::Trace::SpanContext;
 
+    use experimental 'isa';
+
     field $sampler      :param = undef;
     field $id_generator :param = 'OpenTelemetry::Trace';
     field $span_limits  :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
@@ -134,25 +136,32 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         );
     }
 
-    method tracer ( %args ) {
-        # If no name is provided, we get it from the caller
-        # This has to override the version, since the version
-        # only makes sense for the package
-        $args{name} || do {
-            ( $args{name} ) = caller;
-            $args{version}  = $args{name}->VERSION;
-        };
+    method tracer {
+        my $scope = $_[0] isa OpenTelemetry::SDK::InstrumentationScope
+            ? shift : do {
+                my %args = @_;
 
-        OpenTelemetry->logger
-            ->warnf('Got invalid tracer name when retrieving tracer: %s', $args{name})
-            unless $args{name};
+                # If no name is provided, we get it from the caller
+                # This has to override the version, since the version
+                # only makes sense for the name
+                $args{name} || do {
+                    ( $args{name} ) = caller;
+                    $args{version}  = $args{name}->VERSION;
+                };
 
-        my $scope = OpenTelemetry::SDK::InstrumentationScope
-            ->new( %args{qw( name version )} );
+                OpenTelemetry->logger->warnf(
+                    "Got invalid tracer name when retrieving tracer: %s. Setting to 'null'",
+                    $args{name},
+                ) unless $args{name};
+
+                $args{name} //= 'null';
+
+                OpenTelemetry::SDK::InstrumentationScope
+                    ->new( %args{qw( name version )} );
+            };
 
         $registry_lock->enter( sub {
             $registry{ $scope->to_string } //= OpenTelemetry::SDK::Trace::Tracer->new(
-                %args,
                 span_creator => sub { $self->$create_span( @_, scope => $scope ) },
             );
         });
