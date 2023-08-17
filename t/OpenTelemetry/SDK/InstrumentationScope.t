@@ -5,10 +5,14 @@ use Test2::V0 -target => 'OpenTelemetry::SDK::InstrumentationScope';
 use OpenTelemetry::Test::Logs;
 
 is CLASS->new( name => 'foo' ), object {
+    call name      => 'foo';
+    call version   => '';
     call to_string => '[foo:]';
 }, 'Default version';
 
 is CLASS->new( name => 'foo', version => '0.1' ), object {
+    call name      => 'foo';
+    call version   => '0.1';
     call to_string => '[foo:0.1]';
 }, 'Explicit version';
 
@@ -20,6 +24,8 @@ subtest 'Undefined name' => sub {
     OpenTelemetry::Test::Logs->clear;
 
     is CLASS->new( name => undef ), object {
+        call name      => '';
+        call version   => '';
         call to_string => '[:]';
     }, 'Explicit undefined name';
 
