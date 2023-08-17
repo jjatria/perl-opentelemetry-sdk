@@ -16,18 +16,35 @@ is CLASS->new( name => 'foo', version => undef ), object {
     call to_string => '[foo:]';
 }, 'Explicit undefined version';
 
-OpenTelemetry::Test::Logs->clear;
+subtest 'Undefined name' => sub {
+    OpenTelemetry::Test::Logs->clear;
 
-is CLASS->new( name => undef ), object {
-    call to_string => '[:]';
-}, 'Explicit undefined name';
+    is CLASS->new( name => undef ), object {
+        call to_string => '[:]';
+    }, 'Explicit undefined name';
 
-is + OpenTelemetry::Test::Logs->messages, [
-    [
-        warning => 'OpenTelemetry',
-        'Created an instrumentation scope with an undefined name',
-    ],
-], 'Warned about undefined name';
+    is + OpenTelemetry::Test::Logs->messages, [
+        [
+            warning => 'OpenTelemetry',
+            'Created an instrumentation scope with an undefined or empty name',
+        ],
+    ], 'Warned about undefined name';
+};
+
+subtest 'Empty name' => sub {
+    OpenTelemetry::Test::Logs->clear;
+
+    is CLASS->new( name => '' ), object {
+        call to_string => '[:]';
+    }, 'Explicit undefined name';
+
+    is + OpenTelemetry::Test::Logs->messages, [
+        [
+            warning => 'OpenTelemetry',
+            'Created an instrumentation scope with an undefined or empty name',
+        ],
+    ], 'Warned about undefined name';
+};
 
 like dies { CLASS->new },
     qr/Required parameter 'name' is missing/,
