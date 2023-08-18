@@ -1,8 +1,7 @@
 #!/usr/bin/env perl
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::InstrumentationScope';
-
-use OpenTelemetry::Test::Logs;
+use Test2::Tools::OpenTelemetry;
 
 is CLASS->new( name => 'foo' ), object {
     call name      => 'foo';
@@ -21,15 +20,13 @@ is CLASS->new( name => 'foo', version => undef ), object {
 }, 'Explicit undefined version';
 
 subtest 'Undefined name' => sub {
-    OpenTelemetry::Test::Logs->clear;
-
-    is CLASS->new( name => undef ), object {
-        call name      => '';
-        call version   => '';
-        call to_string => '[:]';
-    }, 'Explicit undefined name';
-
-    is + OpenTelemetry::Test::Logs->messages, [
+    is messages {
+        is CLASS->new( name => undef ), object {
+            call name      => '';
+            call version   => '';
+            call to_string => '[:]';
+        }, 'Explicit undefined name';
+    } => [
         [
             warning => 'OpenTelemetry',
             'Created an instrumentation scope with an undefined or empty name',
@@ -38,13 +35,11 @@ subtest 'Undefined name' => sub {
 };
 
 subtest 'Empty name' => sub {
-    OpenTelemetry::Test::Logs->clear;
-
-    is CLASS->new( name => '' ), object {
-        call to_string => '[:]';
-    }, 'Explicit undefined name';
-
-    is + OpenTelemetry::Test::Logs->messages, [
+    is messages {
+        is CLASS->new( name => '' ), object {
+            call to_string => '[:]';
+        }, 'Explicit undefined name';
+    } => [
         [
             warning => 'OpenTelemetry',
             'Created an instrumentation scope with an undefined or empty name',

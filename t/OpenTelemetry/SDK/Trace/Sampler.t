@@ -1,8 +1,7 @@
 #!/usr/bin/env perl
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Sampler';
-
-use OpenTelemetry::Test::Logs;
+use Test2::Tools::OpenTelemetry;
 
 is CLASS->ALWAYS_OFF, object {
     prop isa => 'OpenTelemetry::SDK::Trace::Sampler::Constant';
@@ -23,18 +22,18 @@ is CLASS->ALWAYS_ON, object {
 }, 'ALWAYS_ON is sampled and recording';
 
 subtest Constructor => sub {
-    is CLASS->new( ParentBased => ( root => mock ) ), object {
-        prop isa => 'OpenTelemetry::SDK::Trace::Sampler::ParentBased';
-    }, 'Can create other samplers';
+    no_messages {
+        is CLASS->new( ParentBased => ( root => mock ) ), object {
+            prop isa => 'OpenTelemetry::SDK::Trace::Sampler::ParentBased';
+        }, 'Can create other samplers';
+    };
 
-    OpenTelemetry::Test::Logs->clear;
-
-    is CLASS->new( FakeSampler => ( root => mock ) ), object {
-        prop isa         => 'OpenTelemetry::SDK::Trace::Sampler::Constant';
-        call description => 'AlwaysOffSampler';
-    }, 'Falls back to ALWAYS_OFF';
-
-    is + OpenTelemetry::Test::Logs->messages, [
+    is messages {
+        is CLASS->new( FakeSampler => ( root => mock ) ), object {
+            prop isa         => 'OpenTelemetry::SDK::Trace::Sampler::Constant';
+            call description => 'AlwaysOffSampler';
+        }, 'Falls back to ALWAYS_OFF';
+    } => [
         [
             warning => 'OpenTelemetry',
             match qr/^Cannot create FakeSampler sampler: /
