@@ -84,8 +84,12 @@
          "file" : "lib/OpenTelemetry/SDK/Trace/Sampler.pm",
          "version" : "0.001"
       },
-      "OpenTelemetry::SDK::Trace::Sampler::Constant" : {
-         "file" : "lib/OpenTelemetry/SDK/Trace/Sampler/Constant.pm",
+      "OpenTelemetry::SDK::Trace::Sampler::AlwaysOff" : {
+         "file" : "lib/OpenTelemetry/SDK/Trace/Sampler/AlwaysOff.pm",
+         "version" : "0.001"
+      },
+      "OpenTelemetry::SDK::Trace::Sampler::AlwaysOn" : {
+         "file" : "lib/OpenTelemetry/SDK/Trace/Sampler/AlwaysOn.pm",
          "version" : "0.001"
       },
       "OpenTelemetry::SDK::Trace::Sampler::ParentBased" : {

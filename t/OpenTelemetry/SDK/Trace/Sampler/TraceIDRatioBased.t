@@ -7,37 +7,49 @@ use OpenTelemetry::Trace;
 is CLASS->new->description, 'TraceIDRatioBased{1.0}',
     'Sampler defaults to 1.0';
 
-my ( $all, $most, $some, $few, $none )
-    = map CLASS->new( ratio => $_ ), 1, .75, .5, .25,  0;
+my ( $all, $almost_all, $most, $some, $few, $almost_none, $none )
+    = map CLASS->new( ratio => $_ ), 1, 0.999999, .75, .5, .25,  0.000001, 0;
 
 for (
-    [ pack( 'H*', 'a406c68a98eee445b6b6dc65ab0dab4e' ), 0.96, 1, 0, 0, 0, 0 ],
-    [ pack( 'H*', '910638ea0e3d867287ebdce025679134' ), 0.69, 1, 1, 0, 0, 0 ],
-    [ pack( 'H*', '1500e7f19819e79bfa49d23c80e811aa' ), 0.32, 1, 1, 1, 0, 0 ],
-    [ pack( 'H*', '36258adf4cb55244e35d7f74a44d564d' ), 0.10, 1, 1, 1, 1, 0 ],
+    [ pack( 'H*', '0000000000000000ffffffffffffffff' ), T, F, F, F, F, F, F ],
+    [ pack( 'H*', '0000000000000000ffffef39085f4a13' ), T, F, F, F, F, F, F ],
+    [ pack( 'H*', '0000000000000000ffffef39085f4a12' ), T, T, F, F, F, F, F ],
+    [ pack( 'H*', '0000000000000000aaaaaaaaaaaaaaaa' ), T, T, T, F, F, F, F ],
+    [ pack( 'H*', '00000000000000005555555555555555' ), T, T, T, T, F, F, F ],
+    [ pack( 'H*', '0000000000000000000010c6f7a0b5ee' ), T, T, T, T, T, F, F ],
+    [ pack( 'H*', '0000000000000000000010c6f7a0b5ed' ), T, T, T, T, T, T, F ],
+    [ pack( 'H*', '00000000000000000000000000000000' ), T, T, T, T, T, T, F ],
 ) {
-    my ( $id, $ratio, @want ) = @$_;
+    my ( $id, @want ) = @$_;
 
-    subtest $ratio => sub {
+    subtest sprintf( 'With ID %s', unpack 'H*', $id ) => sub {
         is $all->should_sample( trace_id => $id ), object {
-            call recording => $want[0] ? T : F;
-        }, 'all';
+            call recording => $want[0];
+        }, 'Sample all';
+
+        is $almost_all->should_sample( trace_id => $id ), object {
+            call recording => $want[1];
+        }, 'Sample almost all';
 
         is $most->should_sample( trace_id => $id ), object {
-            call recording => $want[1] ? T : F;
-        }, 'most';
+            call recording => $want[2];
+        }, 'Sample most';
 
         is $some->should_sample( trace_id => $id ), object {
-            call recording => $want[2] ? T : F;
-        }, 'some';
+            call recording => $want[3];
+        }, 'Sample some';
 
         is $few->should_sample( trace_id => $id ), object {
-            call recording => $want[3] ? T : F;
-        }, 'few';
+            call recording => $want[4];
+        }, 'Sample a few';
+
+        is $almost_none->should_sample( trace_id => $id ), object {
+            call recording => $want[5];
+        }, 'Almost never sample';
 
         is $none->should_sample( trace_id => $id ), object {
-            call recording => $want[4] ? T : F;
-        }, 'none';
+            call recording => $want[6];
+        }, 'Never sample';
     };
 }
 

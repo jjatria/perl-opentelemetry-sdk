@@ -19,7 +19,10 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use OpenTelemetry::Propagator::TraceContext::TraceFlags;
     use OpenTelemetry::SDK::InstrumentationScope;
     use OpenTelemetry::SDK::Resource;
-    use OpenTelemetry::SDK::Trace::Sampler;
+    use OpenTelemetry::SDK::Trace::Sampler::AlwaysOff;
+    use OpenTelemetry::SDK::Trace::Sampler::AlwaysOn;
+    use OpenTelemetry::SDK::Trace::Sampler::ParentBased;
+    use OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased;
     use OpenTelemetry::SDK::Trace::Span;
     use OpenTelemetry::SDK::Trace::SpanLimits;
     use OpenTelemetry::SDK::Trace::Tracer;
@@ -41,33 +44,34 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     ADJUST {
         try {
             for ( $ENV{OTEL_TRACES_SAMPLER} // 'parentbased_always_on' ) {
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler::ALWAYS_ON  if $_ eq 'always_on';
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler::ALWAYS_OFF if $_ eq 'always_off';
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::AlwaysOn->new
+                    if $_ eq 'always_on';
 
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler->new(
-                    TraceIDRatioBased => ( ratio => $ENV{OTEL_TRACES_SAMPLER_ARG} // 1 )
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::AlwaysOff->new
+                    if $_ eq 'always_off';
+
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased->new(
+                    ratio => config('TRACES_SAMPLER_ARG') // 1,
                 ) if $_ eq 'traceidratio';
 
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler->new(
-                    ParentBased => ( root => OpenTelemetry::SDK::Trace::Sampler::ALWAYS_ON )
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::ParentBased->new(
+                    root => OpenTelemetry::SDK::Trace::Sampler::AlwaysOn->new,
                 ) if $_ eq 'parentbased_always_on';
 
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler->new(
-                    ParentBased => ( root => OpenTelemetry::SDK::Trace::Sampler::ALWAYS_OFF )
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::ParentBased->new(
+                    root => OpenTelemetry::SDK::Trace::Sampler::AlwaysOff->new,
                 ) if $_ eq 'parentbased_always_off';
 
-                $sampler //= OpenTelemetry::SDK::Trace::Sampler->new(
-                    ParentBased => (
-                        root => OpenTelemetry::SDK::Trace::Sampler->new(
-                            TraceIDRatioBased => ( ratio => $ENV{OTEL_TRACES_SAMPLER_ARG} // 1 )
-                        ),
-                    )
+                $sampler //= OpenTelemetry::SDK::Trace::Sampler::ParentBased->new(
+                    root => OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased->new(
+                        ratio => config('TRACES_SAMPLER_ARG') // 1,
+                    ),
                 ) if $_ eq 'parentbased_traceidratio';
             }
         }
         catch ($e) {
-            my $default = OpenTelemetry::SDK::Trace::Sampler->new(
-                ParentBased => ( root => OpenTelemetry::SDK::Trace::Sampler::ALWAYS_ON )
+            my $default = OpenTelemetry::SDK::Trace::Sampler::ParentBased->new(
+                root => OpenTelemetry::SDK::Trace::Sampler::AlwaysOn->new,
             );
 
             OpenTelemetry->handle_error(

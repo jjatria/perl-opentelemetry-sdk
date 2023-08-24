@@ -24,18 +24,19 @@ my %samplers = map {
 
 my $test = CLASS->new(%samplers);
 
-is $test->should_sample, 'local_parent_not_sampled', 'Defaults to local not sampled';
+# TODO: arguments to this method are documented as 'required'
+is $test->should_sample, 'root', 'Defaults to root';
 
 for (
     # valid  remote  sampled  want
-    [     0,      0,       0, 'local_parent_not_sampled'  ],
-    [     0,      0,       1, 'local_parent_sampled'      ],
-    [     0,      1,       0, 'remote_parent_not_sampled' ],
-    [     0,      1,       1, 'remote_parent_sampled'     ],
-    [     1,      0,       0, 'root'                      ],
-    [     1,      0,       1, 'root'                      ],
-    [     1,      1,       0, 'root'                      ],
-    [     1,      1,       1, 'root'                      ],
+    [     1,      0,       0, 'local_parent_not_sampled'  ],
+    [     1,      0,       1, 'local_parent_sampled'      ],
+    [     1,      1,       0, 'remote_parent_not_sampled' ],
+    [     1,      1,       1, 'remote_parent_sampled'     ],
+    [     0,      0,       0, 'root'                      ],
+    [     0,      0,       1, 'root'                      ],
+    [     0,      1,       0, 'root'                      ],
+    [     0,      1,       1, 'root'                      ],
 ) {
     my ( $valid, $remote, $sampled, $want ) = @$_;
 
