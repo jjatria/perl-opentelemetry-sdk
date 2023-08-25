@@ -47,6 +47,33 @@ class OpenTelemetry::SDK::Trace::Span
     field @links;
     field @processors;
 
+    # Internal method for adding a single link
+    #
+    #     $self->$add_link({
+    #         context    => $valid_span_context,
+    #         attributes => \%link_attributes,
+    #     })
+    #
+    # Links with invalid span contexts are ignored
+    #
+    method $add_link ( $args ) {
+        return unless $args->{context} isa OpenTelemetry::Trace::SpanContext
+            && $args->{context}->valid;
+
+        if ( scalar @links >= $limits->link_count_limit ) {
+            $dropped_links++;
+            $logger->warn('Dropped link because it would exceed specified limit');
+            return;
+        }
+
+        push @links, OpenTelemetry::Trace::Link->new(
+            context                => $args->{context},
+            attributes             => $args->{attributes},
+            attribute_count_limit  => $limits->link_attribute_count_limit,
+            attribute_length_limit => $limits->link_attribute_length_limit,
+        );
+    }
+
     ADJUSTPARAMS ( $params ) {
         my $now = time;
         undef $start if $start && $start > $now;
@@ -56,11 +83,7 @@ class OpenTelemetry::SDK::Trace::Span
 
         @processors = @{ delete $params->{processors} // [] };
 
-        for my $link ( @{ delete $params->{links} // [] } ) {
-            $link isa OpenTelemetry::Trace::Link
-                ? push( @links, $link )
-                : $self->add_link(%$link);
-        }
+        $self->$add_link($_) for @{ delete $params->{links} // [] };
     }
 
     method set_name ( $new ) {
@@ -90,26 +113,6 @@ class OpenTelemetry::SDK::Trace::Span
         );
 
         $status = $value unless $value->is_unset;
-
-        $self;
-    }
-
-    method add_link ( %args ) {
-        return $self unless $self->recording
-            && $args{context} isa OpenTelemetry::Trace::SpanContext;
-
-        if ( scalar @links >= $limits->link_count_limit ) {
-            $dropped_links++;
-            $logger->warn('Dropped link because it would exceed specified limit');
-            return $self;
-        }
-
-        push @links, OpenTelemetry::Trace::Link->new(
-            context                => $args{context},
-            attributes             => $args{attributes},
-            attribute_count_limit  => $limits->link_attribute_count_limit,
-            attribute_length_limit => $limits->link_attribute_length_limit,
-        );
 
         $self;
     }
@@ -182,3 +185,43 @@ class OpenTelemetry::SDK::Trace::Span
         );
     }
 }
+
+__END__
+
+=encoding UTF-8
+
+=head1 NAME
+
+OpenTelemetry::SDK::Trace::Span - A single operation within a trace
+
+=head1 SYNOPSIS
+
+    ...
+
+=head1 DESCRIPTION
+
+An instance of this class represents a single operation within a trace.
+
+The API for this class is the same as L<OpenTelemetry::Trace::Span>, so please
+refer to that module's documentation for details. While that module provides a
+no-op implementation of the span interface, this one implements the behaviours
+defined by the API.
+
+As with the API module, the only supported way to create a span is through an
+L<OpenTelemetry::Trace::Tracer>. Refer to the
+L<create_span|OpenTelemetry::Trace::Tracer/create_span> method in that class
+for details.
+
+=head1 SEE ALSO
+
+=over
+
+=item L<OpenTelemetry::Trace::Span>
+
+=item L<OpenTelemetry::Trace::Tracer>
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+...
