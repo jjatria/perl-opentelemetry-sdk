@@ -53,9 +53,8 @@ my sub configure_propagators {
         }
     }
 
-    OpenTelemetry->propagation(
-        OpenTelemetry::Propagator::Composite->new(@propagators),
-    );
+    OpenTelemetry->propagator
+        = OpenTelemetry::Propagator::Composite->new(@propagators),
 }
 
 my sub configure_span_processors {
@@ -101,7 +100,7 @@ my sub configure_span_processors {
         }
     }
 
-    return $tracer_provider;
+    OpenTelemetry->tracer_provider = $tracer_provider;
 }
 
 sub import ( $class ) {
@@ -110,9 +109,7 @@ sub import ( $class ) {
         # TODO: error_handler
 
         configure_propagators();
-
-        my $provider = configure_span_processors();
-        OpenTelemetry->tracer_provider($provider);
+        configure_span_processors();
     }
     catch ($e) {
         OpenTelemetry->handle_error(
