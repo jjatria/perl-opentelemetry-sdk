@@ -104,6 +104,8 @@ my sub configure_span_processors {
 }
 
 sub import ( $class ) {
+    return if config('SDK_DISABLED');
+
     try {
         # TODO: logger
         # TODO: error_handler
