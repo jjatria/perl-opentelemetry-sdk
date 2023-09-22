@@ -15,7 +15,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
     use OpenTelemetry::Constants -trace_export;
 
-    use OpenTelemetry::Common qw( timeout_timestamp maybe_timeout );
+    use OpenTelemetry::Common qw( config timeout_timestamp maybe_timeout );
     use OpenTelemetry::Propagator::TraceContext::TraceFlags;
     use OpenTelemetry::SDK::InstrumentationScope;
     use OpenTelemetry::SDK::Resource;
@@ -43,7 +43,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
     ADJUST {
         try {
-            for ( $ENV{OTEL_TRACES_SAMPLER} // 'parentbased_always_on' ) {
+            for ( config('TRACES_SAMPLER') // 'parentbased_always_on' ) {
                 $sampler //= OpenTelemetry::SDK::Trace::Sampler::AlwaysOn->new
                     if $_ eq 'always_on';
 
