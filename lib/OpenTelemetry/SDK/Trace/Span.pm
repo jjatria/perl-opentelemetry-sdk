@@ -38,7 +38,6 @@ class OpenTelemetry::SDK::Trace::Span
     field $limits     :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
     field $lock                = Mutex->new;
     field $name       :param;
-    field $parent     :param   = OpenTelemetry::Trace::SpanContext::INVALID;
     field $resource   :param   = undef;
     field $scope      :param;
     field $start      :param   = undef;
@@ -46,6 +45,7 @@ class OpenTelemetry::SDK::Trace::Span
     field @events;
     field @links;
     field @processors;
+    field $parent_span_contex;
 
     # Internal method for adding a single link
     #
@@ -84,6 +84,13 @@ class OpenTelemetry::SDK::Trace::Span
         @processors = @{ delete $params->{processors} // [] };
 
         $self->$add_link($_) for @{ delete $params->{links} // [] };
+
+        my $parent = delete $params->{parent};
+
+        $parent_span_context
+            = OpenTelemetry::Trace->span_from_context($parent)->context;
+
+        $_->on_start( $self, $parent ) for @processors;
     }
 
     method set_name ( $new ) {
@@ -178,7 +185,7 @@ class OpenTelemetry::SDK::Trace::Span
             kind                  => $kind,
             links                 => [ @links ],
             name                  => $name,
-            parent_span_id        => $parent->span_id,
+            parent_span_id        => $parent_span_context->span_id,
             resource              => $resource,
             start_timestamp       => $start,
             status                => $status,
