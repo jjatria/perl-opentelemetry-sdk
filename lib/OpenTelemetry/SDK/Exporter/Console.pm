@@ -1,11 +1,13 @@
 use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: An OpenTelemetry span exporter that prints to the console
 
-package OpenTelemetry::SDK::Trace::Span::Exporter::Console;
+package OpenTelemetry::SDK::Exporter::Console;
 
 our $VERSION = '0.001';
 
-class OpenTelemetry::SDK::Trace::Span::Exporter::Console :does(OpenTelemetry::SDK::Trace::Span::Exporter) {
+class OpenTelemetry::SDK::Exporter::Console
+    :does(OpenTelemetry::Exporter)
+{
     use feature 'say';
     use Future::AsyncAwait;
 

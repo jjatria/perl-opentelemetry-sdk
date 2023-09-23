@@ -5,7 +5,9 @@ package OpenTelemetry::SDK::Trace::Span::Processor::Simple;
 
 our $VERSION = '0.001';
 
-class OpenTelemetry::SDK::Trace::Span::Processor::Simple :does(OpenTelemetry::SDK::Trace::Span::Processor) {
+class OpenTelemetry::SDK::Trace::Span::Processor::Simple
+    :does(OpenTelemetry::Trace::Span::Processor)
+{
     use experimental 'try';
 
     use Future::AsyncAwait;
@@ -80,8 +82,7 @@ in the documentation for that module.
     );
 
 The constructor takes a mandaory C<exporter> parameter that must be set to an
-instance of a class that I<does> the L<OpenTelemetry::SDK::Trace::Span::Exporter>
-role.
+instance of a class that I<does> the L<OpenTelemetry::Exporter> role.
 
 =head2 on_start
 

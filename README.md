@@ -70,8 +70,8 @@ use OpenTelemetry::SDK;
 # Or configure the SDK programmatically, if your use case requires it:
 #
 # OpenTelemetry->tracer_provider->add_span_processor(
-#     OpenTelemetry::SDK::Trace::Exporter::Simple->new(
-#         OpenTelemetry::SDK::Trace::Exporter::Console->new
+#     OpenTelemetry::SDK::Trace::Span::Processor::Simple->new(
+#         OpenTelemetry::SDK::Exporter::Console->new
 #     ),
 # );
 #

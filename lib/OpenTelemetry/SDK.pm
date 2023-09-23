@@ -61,10 +61,10 @@ my sub configure_span_processors {
     my $logger = OpenTelemetry->logger;
 
     state %map = (
-        jaeger  => 'Jaeger',
-        otlp    => 'OTLP',
-        zipkin  => 'Zipkin',
-        console => 'Console',
+        jaeger  => '::Jaeger',
+        otlp    => '::OTLP',
+        zipkin  => '::Zipkin',
+        console => 'OpenTelemetry::SDK::Exporter::Console',
     );
 
     my @names = split ',',
@@ -83,7 +83,10 @@ my sub configure_span_processors {
 
         next if $seen{ $map{$name} }++;
 
-        my $exporter  = 'OpenTelemetry::SDK::Trace::Span::Exporter::' . $map{$name};
+        my $exporter = $map{name} =~ /^::/
+            ? ( 'OpenTelemetry::Exporter' . $map{$name} )
+            : $map{name};
+
         my $processor = 'OpenTelemetry::SDK::Trace::Span::Processor::'
             . ( $name eq 'console' ? 'Simple' : 'Batch' );
 

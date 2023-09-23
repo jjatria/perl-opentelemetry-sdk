@@ -45,7 +45,7 @@ class OpenTelemetry::SDK::Trace::Span
     field @events;
     field @links;
     field @processors;
-    field $parent_span_contex;
+    field $parent_span_context;
 
     # Internal method for adding a single link
     #

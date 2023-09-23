@@ -5,7 +5,9 @@ package OpenTelemetry::SDK::Trace::Span::Processor::Batch;
 
 our $VERSION = '0.001';
 
-class OpenTelemetry::SDK::Trace::Span::Processor::Batch :does(OpenTelemetry::SDK::Trace::Span::Processor) {
+class OpenTelemetry::SDK::Trace::Span::Processor::Batch
+    :does(OpenTelemetry::Trace::Span::Processor)
+{
     use IO::Async::Loop;
     use IO::Async::Function;
     use OpenTelemetry;

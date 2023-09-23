@@ -72,6 +72,10 @@
          "file" : "lib/OpenTelemetry/SDK.pm",
          "version" : "0.001"
       },
+      "OpenTelemetry::SDK::Exporter::Console" : {
+         "file" : "lib/OpenTelemetry/SDK/Exporter/Console.pm",
+         "version" : "0.001"
+      },
       "OpenTelemetry::SDK::InstrumentationScope" : {
          "file" : "lib/OpenTelemetry/SDK/InstrumentationScope.pm",
          "version" : "0.001"
@@ -106,18 +110,6 @@
       },
       "OpenTelemetry::SDK::Trace::Span" : {
          "file" : "lib/OpenTelemetry/SDK/Trace/Span.pm",
-         "version" : "0.001"
-      },
-      "OpenTelemetry::SDK::Trace::Span::Exporter" : {
-         "file" : "lib/OpenTelemetry/SDK/Trace/Span/Exporter.pm",
-         "version" : "0.001"
-      },
-      "OpenTelemetry::SDK::Trace::Span::Exporter::Console" : {
-         "file" : "lib/OpenTelemetry/SDK/Trace/Span/Exporter/Console.pm",
-         "version" : "0.001"
-      },
-      "OpenTelemetry::SDK::Trace::Span::Processor" : {
-         "file" : "lib/OpenTelemetry/SDK/Trace/Span/Processor.pm",
          "version" : "0.001"
       },
       "OpenTelemetry::SDK::Trace::Span::Processor::Batch" : {
