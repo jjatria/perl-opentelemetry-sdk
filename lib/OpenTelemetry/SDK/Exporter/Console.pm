@@ -20,7 +20,7 @@ class OpenTelemetry::SDK::Exporter::Console
             timestamp          => $event->timestamp,
             name               => $event->name,
             attributes         => $event->attributes,
-            dropped_attributes => 0,
+            dropped_attributes => $event->dropped_attributes,
         }
     }
 
@@ -29,7 +29,7 @@ class OpenTelemetry::SDK::Exporter::Console
             trace_id           => $link->context->trace_id,
             span_id            => $link->context->span_id,
             attributes         => $link->attributes,
-            dropped_attributes => 0,
+            dropped_attributes => $link->dropped_attributes,
         }
     }
 
