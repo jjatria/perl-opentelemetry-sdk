@@ -40,6 +40,13 @@ class OpenTelemetry::SDK::Exporter::Console
         }
     }
 
+    my sub dump_scope ($scope) {
+        {
+            name    => $scope->name,
+            version => $scope->version,
+        }
+    }
+
     async method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;
 
@@ -55,7 +62,7 @@ class OpenTelemetry::SDK::Exporter::Console
                 attributes            => $span->attributes,
                 end_timestamp         => $span->end_timestamp,
                 events                => [ map dump_event($_), $span->events ],
-                instrumentation_scope => $span->instrumentation_scope->to_string,
+                instrumentation_scope => dump_scope($span->instrumentation_scope),
                 kind                  => $span->kind,
                 links                 => [ map dump_link($_), $span->links ],
                 name                  => $span->name,
