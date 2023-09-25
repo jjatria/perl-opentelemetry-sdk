@@ -70,7 +70,6 @@ class OpenTelemetry::SDK::Trace::Span
             context                => $args->{context},
             attributes             => $args->{attributes},
             attribute_count_limit  => $limits->link_attribute_count_limit,
-            attribute_length_limit => $limits->link_attribute_length_limit,
         );
     }
 

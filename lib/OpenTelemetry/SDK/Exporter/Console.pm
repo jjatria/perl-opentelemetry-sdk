@@ -27,8 +27,8 @@ class OpenTelemetry::SDK::Exporter::Console
 
     my sub dump_link ($link) {
         {
-            trace_id           => $link->context->trace_id,
-            span_id            => $link->context->span_id,
+            trace_id           => $link->context->hex_trace_id,
+            span_id            => $link->context->hex_span_id,
             attributes         => $link->attributes,
             dropped_attributes => $link->dropped_attributes,
         }
