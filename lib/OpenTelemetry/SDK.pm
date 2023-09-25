@@ -85,7 +85,7 @@ my sub configure_span_processors {
 
         my $exporter = $map{name} =~ /^::/
             ? ( 'OpenTelemetry::Exporter' . $map{$name} )
-            : $map{name};
+            : $map{$name};
 
         my $processor = 'OpenTelemetry::SDK::Trace::Span::Processor::'
             . ( $name eq 'console' ? 'Simple' : 'Batch' );
