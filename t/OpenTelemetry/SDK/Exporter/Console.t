@@ -1,0 +1,56 @@
+#!/usr/bin/env perl
+
+use Test2::V0 -target => 'OpenTelemetry::SDK::Exporter::Console';
+
+use Test2::Tools::OpenTelemetry;
+use OpenTelemetry::Constants -trace_export;
+use OpenTelemetry::SDK::InstrumentationScope;
+use OpenTelemetry::SDK::Trace::Span;
+use OpenTelemetry::Trace::SpanContext;
+
+my $scope = OpenTelemetry::SDK::InstrumentationScope->new( name => 'test' );
+my $span = OpenTelemetry::SDK::Trace::Span->new(
+    name       => 'test-span',
+    scope      => $scope,
+    attributes => { foo => 123 },
+    context    => OpenTelemetry::Trace::SpanContext->INVALID,
+    start      => 123456789.1234,
+)->snapshot;
+
+open my $handle, '>', \my $out or die $!;
+
+is my $exporter = CLASS->new( handle => $handle ), object {
+    prop isa => $CLASS;
+}, 'Can create exporter';
+
+is $exporter->export( [$span], 100 )->get, TRACE_EXPORT_SUCCESS,
+    'Exporting is successful';
+
+is $out, ( <<'DUMP' =~ s/\n//gr . "\n" ), 'Exported span';
+{'attributes' => {'foo' => 123},'dropped_attributes' => 0,'dropped_e
+vents' => 0,'dropped_links' => 0,'end_timestamp' => undef,'events' =
+> [],'instrumentation_scope' => {'name' => 'test','version' => ''},'
+kind' => 1,'links' => [],'name' => 'test-span','parent_span_id' => '
+0000000000000000','resource' => {},'span_id' => '0000000000000000','
+start_timestamp' => '123456789.1234','status' => {'code' => 0,'descr
+iption' => ''},'trace_flags' => 0,'trace_id' => '0000000000000000000
+0000000000000','trace_state' => ''}
+DUMP
+
+$out = '';
+is $exporter->export([])->get, TRACE_EXPORT_SUCCESS, 'Timeout is optional';
+
+is $out, '', 'Nothing exported if no spans are given';
+
+is $exporter->force_flush( 100 )->get, TRACE_EXPORT_SUCCESS, 'Can force flush';
+is $exporter->force_flush->get, TRACE_EXPORT_SUCCESS, 'Force flushing is optional';
+
+is $exporter->shutdown( 100 )->get, TRACE_EXPORT_SUCCESS, 'Can shutdown exporter';
+
+$out = '';
+is $exporter->export([$span])->get, TRACE_EXPORT_FAILURE,
+    'Exporter does not export if it has been shutdown';
+
+is $out, '', 'Nothing exported on failure';
+
+done_testing;
