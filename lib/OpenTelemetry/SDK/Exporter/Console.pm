@@ -13,6 +13,7 @@ class OpenTelemetry::SDK::Exporter::Console
 
     use OpenTelemetry::Constants -trace_export;
 
+    field $handle :param = \*STDERR;
     field $stopped;
 
     my sub dump_event ($event) {
@@ -58,7 +59,7 @@ class OpenTelemetry::SDK::Exporter::Console
         for my $span (@$spans) {
             my $resource = $span->resource;
 
-            say STDERR Data::Dumper::Dumper({
+            say $handle Data::Dumper::Dumper({
                 attributes            => $span->attributes,
                 end_timestamp         => $span->end_timestamp,
                 events                => [ map dump_event($_), $span->events ],
