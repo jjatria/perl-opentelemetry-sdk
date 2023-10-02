@@ -3,12 +3,21 @@
 use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased';
 
 use OpenTelemetry::Trace;
+use Test2::Tools::OpenTelemetry;
 
 is CLASS->new->description, 'TraceIDRatioBased{1.0}',
     'Sampler defaults to 1.0';
 
 my ( $all, $almost_all, $most, $some, $few, $almost_none, $none )
     = map CLASS->new( ratio => $_ ), 1, 0.999999, .75, .5, .25,  0.000001, 0;
+
+is $all->description, 'TraceIDRatioBased{1.0}';
+is $almost_all->description, 'TraceIDRatioBased{0.999999}';
+is $most->description, 'TraceIDRatioBased{0.75}';
+is $some->description, 'TraceIDRatioBased{0.5}';
+is $few->description, 'TraceIDRatioBased{0.25}';
+is $almost_none->description, 'TraceIDRatioBased{0.000001}';
+is $none->description, 'TraceIDRatioBased{0.0}';
 
 for (
     [ pack( 'H*', '0000000000000000ffffffffffffffff' ), T, F, F, F, F, F, F ],
@@ -52,5 +61,25 @@ for (
         }, 'Never sample';
     };
 }
+
+subtest Validation => sub {
+    for (
+        [ undef, qr/ not a number \{ratio => undef\}/    ],
+        [ 'foo', qr/ not a number \{ratio => "foo"\}/    ],
+        [ -1,    qr/ not in 0..1 range \{ratio => -1\}/  ],
+        [ 123,   qr/ not in 0..1 range \{ratio => 123\}/ ],
+    ) {
+        my ( $ratio, $check ) = @$_;
+        subtest 'Ratio = ' . ( $ratio // 'undef' ) => sub {
+            is messages {
+                is CLASS->new( ratio => $ratio )->description,
+                    'TraceIDRatioBased{1.0}',
+                    'Ratio defaults to 1';
+            } => [
+                [ warning => OpenTelemetry => match $check ],
+            ] => 'Logged invalid ratio';
+        };
+    }
+};
 
 done_testing;

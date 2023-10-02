@@ -10,6 +10,8 @@ use OpenTelemetry::SDK::Trace::Sampler::Result;
 class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
     :does(OpenTelemetry::SDK::Trace::Sampler)
 {
+    use OpenTelemetry;
+    use Scalar::Util 'looks_like_number';
     use String::CRC32 'crc32';
 
     field $threshold;
@@ -17,13 +19,32 @@ class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
     field $description :reader;
 
     ADJUST {
-        $ratio = 0 if $ratio < 0;
-        $ratio = 1 if $ratio > 1;
+        my $logger = OpenTelemetry->logger;
+
+        unless ( looks_like_number $ratio ) {
+            $logger->warn(
+                'Ratio for TraceIDRatioBased sampler was not a number',
+                { ratio => $ratio },
+            );
+            undef $ratio;
+        }
+
+        if ( defined $ratio && ( $ratio < 0 || $ratio > 1 ) ) {
+            $logger->warn(
+                'Ratio for TraceIDRatioBased sampler was not in 0..1 range',
+                { ratio => $ratio },
+            );
+            undef $ratio;
+        }
+
+        $ratio //= 1;
 
         # Ensure ratio is a floating point number
         # but don't lose precision
         $description = sprintf 'TraceIDRatioBased{%s}',
-            $ratio % 1 ? $ratio : sprintf '%.1f', $ratio;
+            $ratio != int $ratio
+                ? sprintf('%f',   $ratio) =~ s/0+$//r
+                : sprintf('%.1f', $ratio);
 
         # This conversion is internal only, just for the placeholder
         # algorithm used below. We convert this to an integer value that
