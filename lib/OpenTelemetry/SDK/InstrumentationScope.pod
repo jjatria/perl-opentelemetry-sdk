@@ -50,7 +50,7 @@ empty string and raise a warning.
 Retrieves the name of the scope as a string. This might be empty f none
 was provided when the scope was constructed.
 
-=head2 name
+=head2 version
 
     $version = $scope->version;
 
