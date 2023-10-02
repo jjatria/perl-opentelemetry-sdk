@@ -8,7 +8,7 @@ use warnings;
 use experimental qw( signatures lexical_subs );
 use feature 'state';
 
-use Module::Runtime 'require_module';
+use Module::Runtime;
 use Feature::Compat::Try;
 use OpenTelemetry::Common 'config';
 use OpenTelemetry::Propagator::Composite;
