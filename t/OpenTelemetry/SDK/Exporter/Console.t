@@ -48,16 +48,16 @@ is $exporter->export( [$span], 100 )->get, TRACE_EXPORT_SUCCESS,
 is $out, ( <<'DUMP' =~ s/\n//gr . "\n" ), 'Exported span';
 {'attributes' => {'foo' => 123},'dropped_attributes' => 0,'dropped_e
 vents' => 0,'dropped_links' => 0,'end_timestamp' => undef,'events' =
-> [{'attributes' => {'event' => '123'},'dropped_attributes' => 0,'na
-me' => 'event','timestamp' => 123456789}],'instrumentation_scope' =>
- {'name' => 'test','version' => ''},'kind' => 1,'links' => [{'attrib
-utes' => {'link' => 123},'dropped_attributes' => 0,'span_id' => '010
-1010101010101','trace_id' => '01010101010101010101010101010101'}],'n
-ame' => 'test-span','parent_span_id' => '0000000000000000','resource
-' => {},'span_id' => '0101010101010101','start_timestamp' => '123456
-789.1234','status' => {'code' => 0,'description' => ''},'trace_flags
-' => 0,'trace_id' => '01010101010101010101010101010101','trace_state
-' => ''}
+> [{'attributes' => {'event' => 123},'dropped_attributes' => 0,'name
+' => 'event','timestamp' => 123456789}],'instrumentation_scope' => {
+'name' => 'test','version' => ''},'kind' => 1,'links' => [{'attribut
+es' => {'link' => 123},'dropped_attributes' => 0,'span_id' => '01010
+10101010101','trace_id' => '01010101010101010101010101010101'}],'nam
+e' => 'test-span','parent_span_id' => '0000000000000000','resource'
+ => {},'span_id' => '0101010101010101','start_timestamp' => '1234567
+89.1234','status' => {'code' => 0,'description' => ''},'trace_flags'
+ => 0,'trace_id' => '01010101010101010101010101010101','trace_state'
+ => ''}
 DUMP
 
 $out = '';
