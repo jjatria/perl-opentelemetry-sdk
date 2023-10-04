@@ -48,7 +48,10 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
         IO::Async::Loop->new->add($function);
 
-        $function->start if config('BSP_START_THREAD_ON_BOOT') // 1;
+        # TODO: Should this be made configurable? The Ruby SDK
+        # allows users to not start the thread on boot, although
+        # this is not standard
+        $function->start;
     }
 
     method $report_dropped_spans ( $count, $reason ) {
