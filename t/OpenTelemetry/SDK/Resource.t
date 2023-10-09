@@ -2,6 +2,7 @@
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Resource';
 use Test2::Tools::OpenTelemetry;
+use B 'perlstring';
 
 require OpenTelemetry::SDK;
 
@@ -56,6 +57,17 @@ subtest New => sub {
                 etc;
             };
         }, 'Constructor service name takes precedence';
+    };
+
+    subtest 'Invalid data' => sub {
+        for ("\t", "\n", "\r", ';', '"', '\\' ) {
+            local %ENV = ( OTEL_RESOURCE_ATTRIBUTES => "key=$_" );
+            is messages {
+                is CLASS->new->attributes->{key}, U, 'Ignored';
+            } => [
+                [ warning => OpenTelemetry => match qr/must be percent-encoded/ ],
+            ] => 'Ignored unescaped ' . perlstring($_);;
+        }
     };
 };
 

@@ -16,8 +16,21 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
     field $schema_url :param :reader //= '';
 
     sub BUILDARGS ( $class, %args ) {
-        my %env = map split( '=', $_, 2 ),
-            split ',', config('RESOURCE_ATTRIBUTES') // '';
+        my %env = map split( '=', $_, 2 ), split ',', config('RESOURCE_ATTRIBUTES') // '';
+
+        for ( keys %env ) {
+            if (
+                # baggage-octet, as per https://w3c.github.io/baggage/#definition
+                $env{$_} =~ /([^ \x{21} \x{23}-\x{2B} \x{2D}-\x{3A} \x{3C}-\x{5B} \x{5D}-\x{7E} ])/xx
+            ) {
+                OpenTelemetry->logger->warn(
+                    'Ignoring invalid resource attribute value in environment: must be percent-encoded',
+                    { key => $_ },
+                );
+
+                delete $env{$_};
+            }
+        }
 
         # Special-cased because of precedence rules
         my $service_name = delete $env{'service.name'};
