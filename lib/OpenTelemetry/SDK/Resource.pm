@@ -1,5 +1,5 @@
 use Object::Pad ':experimental(init_expr)';
-
+# ABSTRACT: Represents the entity producing OpenTelemetry data
 package OpenTelemetry::SDK::Resource;
 
 our $VERSION = '0.001';
@@ -19,10 +19,11 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
         my %env = map split( '=', $_, 2 ),
             split ',', config('RESOURCE_ATTRIBUTES') // '';
 
+        # Special-cased because of precedence rules
+        my $service_name = delete $env{'service.name'};
+        $service_name = config('SERVICE_NAME') // $service_name;
+
         $args{attributes} = {
-            # TODO: Should these be split / moved somewhere else?
-            # How are they overidden?
-            'service.name'            => config('SERVICE_NAME') // 'unknown_service',
             'telemetry.sdk.name'      => 'opentelemetry',
             'telemetry.sdk.language'  => 'perl',
             'telemetry.sdk.version'   => $OpenTelemetry::SDK::VERSION,
@@ -39,6 +40,8 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
             %{ $args{attributes} // {} },
         };
 
+        $args{attributes}{'service.name'} //= $service_name if $service_name;
+
         %args;
     }
 
@@ -49,7 +52,10 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
         my $theirs = $new->schema_url;
 
         if ( $ours && $theirs && $ours ne $theirs ) {
-            OpenTelemetry->logger->warnf("Incompatible resource schema URLs in call to merge. Keeping existing one: '%s'", $ours);
+            OpenTelemetry->logger->warn(
+                'Incompatible resource schema URLs when merging resources. Ignoring new one',
+                { old => $ours, new => $theirs },
+            );
             $theirs = '';
         }
 

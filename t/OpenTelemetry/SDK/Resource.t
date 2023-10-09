@@ -1,13 +1,14 @@
 #!/usr/bin/env perl
 
 use Test2::V0 -target => 'OpenTelemetry::SDK::Resource';
+use Test2::Tools::OpenTelemetry;
 
 require OpenTelemetry::SDK;
 
 local %ENV;
 
 my %default = (
-    'service.name'            => 'unknown_service',
+    'service.name'            => DNE,
     'telemetry.sdk.name'      => 'opentelemetry',
     'telemetry.sdk.language'  => 'perl',
     'telemetry.sdk.version'   => $OpenTelemetry::SDK::VERSION,
@@ -33,9 +34,9 @@ subtest New => sub {
         }, 'Only default attributes';
     };
 
-    subtest 'Empty environment' => sub {
+    subtest 'From environment' => sub {
         local %ENV = (
-            OTEL_RESOURCE_ATTRIBUTES => 'key1=value1,key2=value2',
+            OTEL_RESOURCE_ATTRIBUTES => 'key1=value1,key2=value2,service.name=ignored',
             OTEL_SERVICE_NAME        => 'some_service',
         );
 
@@ -48,6 +49,13 @@ subtest New => sub {
                 'service.name' => 'some_service',
             };
         }, 'Attributes from environment';
+
+        is CLASS->new( attributes => { 'service.name' => 'top-dog' } ), object {
+            call attributes => hash {
+                field 'service.name' => 'top-dog';
+                etc;
+            };
+        }, 'Constructor service name takes precedence';
     };
 };
 
@@ -66,10 +74,14 @@ subtest 'Merge' => sub {
     my $bar = CLASS->new( schema_url => 'bar', attributes => { b => 2, c => 2 } );
     my $non = CLASS->new;
 
-    is $foo->merge($bar), object {
-        call schema_url => 'foo';
-        call attributes => { %default, a => 1, b => 2, c => 2 };
-    }, 'Prefer new but keep schema URL when mismatched';
+    is messages {
+        is $foo->merge($bar), object {
+            call schema_url => 'foo';
+            call attributes => { %default, a => 1, b => 2, c => 2 };
+        }, 'Prefer new but keep schema URL when mismatched';
+    } => [
+        [ warning => OpenTelemetry => match qr/Incompatible.*Ignoring new one/ ],
+    ] => 'Logged mismatched schema URL';
 
     is $bar->merge($foo), object {
         call schema_url => 'bar';
