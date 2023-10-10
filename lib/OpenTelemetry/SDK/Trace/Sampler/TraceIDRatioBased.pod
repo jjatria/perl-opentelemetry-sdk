@@ -44,8 +44,8 @@ with a ratio that is equal to or greater than the first one.
 
 Note that at the time of writing, the specific algorithm used for this sampler
 has
-L<not been decided upon|https://github.com/open-telemetry/opentelemetry-specification/issues/1413>
-, so differences across languages and implementations might result in a given
+L<not been decided upon|https://github.com/open-telemetry/opentelemetry-specification/issues/1413>,
+so differences across languages and implementations might result in a given
 trace not being consistently sampled across components of a large system.
 
 The implementation currently used in this module should be consistent with
@@ -61,7 +61,7 @@ provides.
 
     $sampler = OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased->new(
         ratio => $float // 1,
-    )
+    );
 
 Constructs a new instance of this sampler. Takes a single optional C<ratio>
 named parameter with the ratio to use for the sampling decision. If no ratio

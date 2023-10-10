@@ -6,8 +6,8 @@ OpenTelemetry::SDK::Trace::Sampler::ParentBased - A composite sampler
 
 =head1 SYNOPSIS
 
-    my $sampler = OpenTelemetry::SDK::Trace::Sampler->new(
-        ParentBased => ( root => $parent_sampler )
+    my $sampler = OpenTelemetry::SDK::Trace::Sampler::ParentBased->new(
+        root => $parent_sampler,
     );
 
     my $result = $sampler->should_sample( ... );

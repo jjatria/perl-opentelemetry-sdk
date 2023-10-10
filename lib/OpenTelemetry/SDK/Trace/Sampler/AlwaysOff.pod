@@ -6,7 +6,7 @@ OpenTelemetry::SDK::Trace::Sampler::AlwaysOff - A sampler that will never sample
 
 =head1 SYNOPSIS
 
-    my $sampler = OpenTelemetry::SDK::Trace::Sampler->new('AlwaysOff');
+    my $sampler = OpenTelemetry::SDK::Trace::Sampler::AlwaysOff->new;
 
     my $result = $sampler->should_sample( ... );
 
