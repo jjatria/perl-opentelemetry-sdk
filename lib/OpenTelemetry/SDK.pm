@@ -83,7 +83,7 @@ my sub configure_span_processors {
 
         next if $seen{ $map{$name} }++;
 
-        my $exporter = $map{name} =~ /^::/
+        my $exporter = $map{$name} =~ /^::/
             ? ( 'OpenTelemetry::Exporter' . $map{$name} )
             : $map{$name};
 
