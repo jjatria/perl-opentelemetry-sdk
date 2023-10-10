@@ -1,4 +1,4 @@
-use Object::Pad ':experimental(init_expr)';
+use Object::Pad ':experimental( init_expr mop )';
 
 package OpenTelemetry::SDK::Trace::Span;
 
@@ -11,7 +11,7 @@ use OpenTelemetry::Attributes;
 
 class OpenTelemetry::SDK::Trace::Span
     :isa(OpenTelemetry::Trace::Span)
-    :does(OpenTelemetry::Attributes::Writable)
+    :does(OpenTelemetry::Attributes)
 {
     use experimental 'isa';
 
@@ -107,7 +107,12 @@ class OpenTelemetry::SDK::Trace::Span
         }
 
         # FIXME: Ideally an overridable method from role, but that is not supported
-        $self->_set_attribute( %new );
+        Object::Pad::MOP::Class->for_class('OpenTelemetry::Attributes')
+            ->get_field('$attributes')
+            ->value($self)
+            ->set(%new);
+
+        $self;
     }
 
     method set_status ( $new, $description = undef ) {
