@@ -119,7 +119,7 @@ sub import ( $class ) {
     catch ($e) {
         OpenTelemetry->handle_error(
             exception => $e,
-            message   => "Unexpected configuration error: $e"
+            message   => 'Unexpected configuration error'
         );
     }
 }
