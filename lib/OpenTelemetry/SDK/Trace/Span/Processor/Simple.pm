@@ -10,6 +10,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
 {
     use experimental 'try';
 
+    use OpenTelemetry;
     use Future::AsyncAwait;
     use OpenTelemetry::X;
 
@@ -17,8 +18,8 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
 
     ADJUST {
         die OpenTelemetry::X->create(
-            Invalid => "Exporter does not support 'export' method: " . ( ref $exporter || $exporter )
-        ) unless $exporter->can('export'); # TODO: is there an isa for roles?
+            Invalid => "Exporter must implement the OpenTelemetry::Exporter interface: " . ( ref $exporter || $exporter )
+        ) unless $exporter && $exporter->DOES('OpenTelemetry::Exporter');
     }
 
     method on_start ( $span, $context ) { }
@@ -31,7 +32,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
         catch ($e) {
             OpenTelemetry->handle_error(
                 exception => $e,
-                message   => sprintf('unexpected error in %s->on_end', ref $self),
+                message   => 'unexpected error in ' . ref($self) . '->on_end',
             );
         }
 
