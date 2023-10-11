@@ -9,6 +9,8 @@ requires 'OpenTelemetry';
 requires 'String::CRC32';
 
 on test => sub {
+    requires 'File::Temp';
+    requires 'JSON::PP';
     requires 'Syntax::Keyword::Dynamically';
     requires 'Test2::V0';
 };

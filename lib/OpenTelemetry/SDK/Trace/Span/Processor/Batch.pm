@@ -8,13 +8,15 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     :does(OpenTelemetry::Trace::Span::Processor)
 {
-    use IO::Async::Loop;
+    use Feature::Compat::Try;
+    use Future::AsyncAwait;
     use IO::Async::Function;
-    use OpenTelemetry;
+    use IO::Async::Loop;
+    use Mutex;
     use OpenTelemetry::Common 'config';
     use OpenTelemetry::Constants -trace_export;
-    use Future::AsyncAwait;
-    use Mutex;
+    use OpenTelemetry::X;
+    use OpenTelemetry;
 
     use Metrics::Any '$metrics', strict => 0;
     my $logger = OpenTelemetry->logger;
@@ -31,6 +33,10 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     field @queue;
 
     ADJUST {
+        die OpenTelemetry::X->create(
+            Invalid => "Exporter must implement the OpenTelemetry::Exporter interface: " . ( ref $exporter || $exporter )
+        ) unless $exporter && $exporter->DOES('OpenTelemetry::Exporter');
+
         if ( $batch_size > $max_queue_size ) {
             OpenTelemetry->logger->warnf(
                 'Max export batch size (%s) was greater than maximum queue size (%s) when instantiating batch processor',
@@ -107,20 +113,52 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         return;
     }
 
-    # TODO: validate exporter?
-
     method on_start ( $span, $context ) { }
 
     method on_end ($span) {
-        return unless $span->context->trace_flags->sampled;
+        try {
+            return unless $span->context->trace_flags->sampled;
 
-        $lock->enter( sub { push @queue, $span } );
-        $self->$maybe_process_batch;
+            $lock->enter(
+                sub {
+                    if ( my $overflow = @queue + 1 - $max_queue_size ) {
+                        # If the buffer is full, we drop old spans first
+                        # The queue is always FIFO, even for dropped spans
+                        # This behaviour is not in the spec, but is
+                        # consistent with the Ruby implementation.
+                        # For context, the Go implementation instead
+                        # blocks until there is room in the buffer.
+                        splice @queue, 0, $overflow;
+                        $self->$report_dropped_spans(
+                            $overflow,
+                            'buffer-full',
+                        );
+                    }
+
+                    push @queue, $span
+                }
+            );
+
+            $self->$maybe_process_batch;
+        }
+        catch ($e) {
+            OpenTelemetry->handle_error(
+                exception => $e,
+                message   => 'unexpected error in ' . ref($self) . '->on_end',
+            );
+        }
 
         return;
     }
 
-    async method shutdown ( $timeout = undef ) { ... }
+    async method shutdown ( $timeout = undef ) {
+        # TODO: There is lots more that needs to go here
+        await $exporter->shutdown($timeout);
+    }
 
     async method force_flush ( $timeout = undef ) { ... }
+
+    method DESTROY {
+        $function->stop->get if $function && $function->workers;
+    }
 }
