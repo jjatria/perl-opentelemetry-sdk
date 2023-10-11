@@ -12,15 +12,15 @@ OpenTelemetry::SDK::Trace::Processor::Simple - A basic OpenTelemetry span proces
 
 This is a simple span processor that receives read-only
 L<OpenTelemetry::Trace::Span> instances and forwards them to an exporter as
-writable instances of L<OpenTelemetry::SDK::Trace::SpanData>.
+writable instances of L<OpenTelemetry::SDK::Trace::Span::Readable>.
 
 This processor will mostly be useful for testing. It could be suitable for
 use in production environments in cases where custom attributes should be
 added to spans based on code scopes, etc.
 
 This class I<does> the role defined in
-L<OpenTelemetry::SDK::Trace::Span::Processor>. Further details can be found
-in the documentation for that module.
+L<OpenTelemetry::Trace::Span::Processor>. Further details can be found in the
+documentation for that module.
 
 =head1 METHODS
 
@@ -50,15 +50,31 @@ writable instance and forward it to the configured exporter.
 
     $result = await $processor->force_flush( $timeout );
 
-Calls C<force_flush> on the configured exporter and returns a L<Future> that
-will hold the result of that operation.
+Calls L<"force_flush"|OpenTelemetry::Exporter/force_flush> on the configured
+exporter and returns a L<Future> that will hold the result of that operation.
 
 =head2 shutdown
 
     $result = await $processor->shutdown( $timeout );
 
-Calls C<shutdown> on the configured exporter and returns a L<Future> that will
-hold the result of that operation.
+Calls L<"shutdown"|OpenTelemetry::Exporter/shutdown> on the configured
+exporter and returns a L<Future> that will hold the result of that operation.
+
+=head1 SEE ALSO
+
+=over
+
+=item L<Future>
+
+=item L<OpenTelemetry::Exporter>
+
+=item L<OpenTelemetry::SDK::Trace::Span::Readable>
+
+=item L<OpenTelemetry::Trace::Span>
+
+=item L<OpenTelemetry::Trace::Span::Processor>
+
+=back
 
 =head1 COPYRIGHT AND LICENSE
 
