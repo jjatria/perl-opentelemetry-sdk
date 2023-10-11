@@ -8,11 +8,10 @@ our $VERSION = '0.001';
 class OpenTelemetry::SDK::Trace::Span::Processor::Simple
     :does(OpenTelemetry::Trace::Span::Processor)
 {
-    use experimental 'try';
-
-    use OpenTelemetry;
+    use Feature::Compat::Try;
     use Future::AsyncAwait;
     use OpenTelemetry::X;
+    use OpenTelemetry;
 
     field $exporter :param;
 
