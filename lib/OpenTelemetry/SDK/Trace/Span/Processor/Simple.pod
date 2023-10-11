@@ -12,17 +12,17 @@ OpenTelemetry::SDK::Trace::Processor::Simple - A basic OpenTelemetry span proces
 
 This is a simple span processor that receives read-only
 L<OpenTelemetry::Trace::Span> instances and forwards them to an exporter as
-writable instances of L<OpenTelemetry::SDK::Trace::Span::Readable>.
+readable instances of L<OpenTelemetry::SDK::Trace::Span::Readable>.
 
 This processor will mostly be useful for testing. It could be suitable for
 use in production environments in cases where custom attributes should be
 added to spans based on code scopes, etc.
 
-This class I<does> the role defined in
-L<OpenTelemetry::Trace::Span::Processor>. Further details can be found in the
-documentation for that module.
-
 =head1 METHODS
+
+This class implements the L<OpenTelemetry::Trace::Span::Processor> role.
+Please consult that module's documentation for details on the behaviours it
+provides.
 
 =head2 new
 
@@ -31,7 +31,7 @@ documentation for that module.
     );
 
 The constructor takes a mandatory C<exporter> parameter that must be set to an
-instance of a class that I<does> the L<OpenTelemetry::Exporter> role.
+instance of a class that implements the L<OpenTelemetry::Exporter> role.
 
 =head2 on_start
 
@@ -44,7 +44,7 @@ Called when a span is started. In this class, this method does nothing.
     $processor->on_end( $span );
 
 Called when a span is ended. Calling this will convert the span into a
-writable instance and forward it to the configured exporter.
+readable instance and forward it to the configured exporter.
 
 =head2 force_flush
 
