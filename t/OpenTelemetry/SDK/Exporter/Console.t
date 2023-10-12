@@ -42,7 +42,7 @@ is my $exporter = CLASS->new( handle => $handle ), object {
     prop isa => $CLASS;
 }, 'Can create exporter';
 
-is $exporter->export( [$span], 100 )->get, TRACE_EXPORT_SUCCESS,
+is $exporter->export( [$span], 100 ), TRACE_EXPORT_SUCCESS,
     'Exporting is successful';
 
 is $out, ( <<'DUMP' =~ s/\n//gr . "\n" ), 'Exported span';
@@ -61,17 +61,17 @@ e' => 'test-span','parent_span_id' => '0000000000000000','resource'
 DUMP
 
 $out = '';
-is $exporter->export([])->get, TRACE_EXPORT_SUCCESS, 'Timeout is optional';
+is $exporter->export([]), TRACE_EXPORT_SUCCESS, 'Timeout is optional';
 
 is $out, '', 'Nothing exported if no spans are given';
 
-is $exporter->force_flush( 100 )->get, TRACE_EXPORT_SUCCESS, 'Can force flush';
-is $exporter->force_flush->get, TRACE_EXPORT_SUCCESS, 'Force flushing is optional';
+is $exporter->force_flush( 100 ), TRACE_EXPORT_SUCCESS, 'Can force flush';
+is $exporter->force_flush, TRACE_EXPORT_SUCCESS, 'Force flushing is optional';
 
-is $exporter->shutdown( 100 )->get, TRACE_EXPORT_SUCCESS, 'Can shutdown exporter';
+is $exporter->shutdown( 100 ), TRACE_EXPORT_SUCCESS, 'Can shutdown exporter';
 
 $out = '';
-is $exporter->export([$span])->get, TRACE_EXPORT_FAILURE,
+is $exporter->export([$span]), TRACE_EXPORT_FAILURE,
     'Exporter does not export if it has been shutdown';
 
 is $out, '', 'Nothing exported on failure';

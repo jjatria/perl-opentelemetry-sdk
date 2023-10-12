@@ -5,15 +5,14 @@ use Test2::Tools::Spec;
 use Test2::Tools::OpenTelemetry;
 
 use Object::Pad;
-use Future::AsyncAwait;
 
 class Local::Test :does(OpenTelemetry::Exporter) {
     field $calls :reader = [];
     method $log { push @$calls, [ @_ ] }
 
-    async method export      { $self->$log( export      => @_ ); 1 }
-    async method shutdown    { $self->$log( shutdown    => @_ ); 1 }
-    async method force_flush { $self->$log( force_flush => @_ ); 1 }
+    method export      { $self->$log( export      => @_ ); 1 }
+    method shutdown    { $self->$log( shutdown    => @_ ); 1 }
+    method force_flush { $self->$log( force_flush => @_ ); 1 }
 }
 
 like dies { CLASS->new },

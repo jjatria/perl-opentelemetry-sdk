@@ -5,7 +5,6 @@ use Test2::Tools::Spec;
 use Test2::Tools::OpenTelemetry;
 
 use Object::Pad;
-use Future::AsyncAwait;
 
 class Local::Test :does(OpenTelemetry::Exporter) {
     use File::Temp 'tempfile';
@@ -33,9 +32,9 @@ class Local::Test :does(OpenTelemetry::Exporter) {
         \@calls;
     }
 
-    async method export      { $self->$log( export      => @_ ); 1 }
-    async method shutdown    { $self->$log( shutdown    => @_ ); 1 }
-    async method force_flush { $self->$log( force_flush => @_ ); 1 }
+    method export      { $self->$log( export      => @_ ); 1 }
+    method shutdown    { $self->$log( shutdown    => @_ ); 1 }
+    method force_flush { $self->$log( force_flush => @_ ); 1 }
 }
 
 is my $proc = CLASS->new( exporter => Local::Test->new ), object {
@@ -123,7 +122,7 @@ describe on_end => sub {
             };
 
             # Make sure we wait before reading the calls
-            $processor->shutdown->get;
+            $processor->shutdown;
 
             is $exporter->calls, \@calls, 'Correct calls on exporter';
         };

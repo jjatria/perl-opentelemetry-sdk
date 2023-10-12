@@ -48,7 +48,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
         $function = IO::Async::Function->new(
             code => sub ( $exporter, $batch, $timeout ) {
-                $exporter->export( $batch, $timeout )->get;
+                $exporter->export( $batch, $timeout );
             },
         );
 
@@ -153,7 +153,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
     async method shutdown ( $timeout = undef ) {
         # TODO: There is lots more that needs to go here
-        await $exporter->shutdown($timeout);
+        $exporter->shutdown($timeout);
     }
 
     async method force_flush ( $timeout = undef ) { ... }

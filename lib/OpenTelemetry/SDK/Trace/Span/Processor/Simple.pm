@@ -26,7 +26,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
     method on_end ($span) {
         try {
             return unless $span->context->trace_flags->sampled;
-            $exporter->export( [$span->snapshot] )->get;
+            $exporter->export( [$span->snapshot] );
         }
         catch ($e) {
             OpenTelemetry->handle_error(
@@ -39,10 +39,10 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
     }
 
     async method shutdown ( $timeout = undef ) {
-        await $exporter->shutdown( $timeout );
+        $exporter->shutdown( $timeout );
     }
 
     async method force_flush ( $timeout = undef ) {
-        await $exporter->force_flush( $timeout );
+        $exporter->force_flush( $timeout );
     }
 }

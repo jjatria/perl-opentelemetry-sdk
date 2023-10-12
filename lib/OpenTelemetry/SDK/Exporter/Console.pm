@@ -9,7 +9,6 @@ class OpenTelemetry::SDK::Exporter::Console
     :does(OpenTelemetry::Exporter)
 {
     use feature 'say';
-    use Future::AsyncAwait;
 
     use OpenTelemetry::Constants -trace_export;
 
@@ -48,7 +47,7 @@ class OpenTelemetry::SDK::Exporter::Console
         }
     }
 
-    async method export ( $spans, $timeout = undef ) {
+    method export ( $spans, $timeout = undef ) {
         return TRACE_EXPORT_FAILURE if $stopped;
 
         require Data::Dumper;
@@ -84,10 +83,10 @@ class OpenTelemetry::SDK::Exporter::Console
         TRACE_EXPORT_SUCCESS;
     }
 
-    async method shutdown ( $timeout = undef ) {
+    method shutdown ( $timeout = undef ) {
         $stopped = 1;
         TRACE_EXPORT_SUCCESS;
     }
 
-    async method force_flush ( $timeout = undef ) { TRACE_EXPORT_SUCCESS }
+    method force_flush ( $timeout = undef ) { TRACE_EXPORT_SUCCESS }
 }
