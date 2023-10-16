@@ -64,8 +64,8 @@ that module's documentation for details on the behaviours it provides.
 =head2 new
 
     $resource = OpenTelemetry::SDK::Resource->new(
-        schema_url => $schema_url,  # optional
         attributes => \%attributes, # optional
+        schema_url => $schema_url,  # optional
     );
 
 Construct a new resource instance. Takes a schema URL and a list of
@@ -124,6 +124,16 @@ The stringified value of L<$^V|https://perldoc.perl.org/perlvar#$^V>.
 As explained in the L</CONFIGURATION> section above, user-provided
 attributes will take precedence over those that are automatically
 detected, and those that are read from the environment.
+
+=head2 empty
+
+    $resource = OpenTelemetry::SDK::Resource->empty(
+        attributes => \%attributes, # optional
+        schema_url => $schema_url,  # optional
+    );
+
+Accepts the same parameters as L</new>, but returns a resource with no
+additional automatic attribute detection.
 
 =head2 merge
 

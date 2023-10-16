@@ -18,7 +18,7 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
     sub empty { shift->new( empty => 1, @_ ) }
 
     sub BUILDARGS ( $class, %args ) {
-        return %args{schema_url} if delete $args{empty};
+        return %args if delete $args{empty};
 
         my %env = map split( '=', $_, 2 ),
             split ',', config('RESOURCE_ATTRIBUTES') // '';

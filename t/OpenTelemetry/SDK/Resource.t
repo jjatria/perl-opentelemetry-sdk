@@ -70,7 +70,7 @@ subtest New => sub {
         }
     };
 
-    subtest 'Empty' => sub {
+    subtest 'Empty resource' => sub {
         is CLASS->empty, object {
             call attributes => {};
             call schema_url => '';
@@ -80,6 +80,11 @@ subtest New => sub {
             call attributes => {};
             call schema_url => 'foo';
         } => 'Can set schema_url in empty resource';
+
+        is CLASS->empty( attributes => { foo => 1 } ), object {
+            call attributes => { foo => 1 };
+            call schema_url => '';
+        } => 'Can set attributes in empty resource';
     };
 };
 
