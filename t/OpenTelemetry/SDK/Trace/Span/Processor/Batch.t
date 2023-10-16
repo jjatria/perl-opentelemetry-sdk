@@ -32,9 +32,9 @@ class Local::Test :does(OpenTelemetry::Exporter) {
         \@calls;
     }
 
-    method export      { $self->$log( export      => @_ ); 1 }
-    method shutdown    { $self->$log( shutdown    => @_ ); 1 }
-    method force_flush { $self->$log( force_flush => @_ ); 1 }
+    method export      { $self->$log( export      => @_ ); 0 }
+    method shutdown    { $self->$log( shutdown    => @_ ); 0 }
+    method force_flush { $self->$log( force_flush => @_ ); 0 }
 }
 
 is my $proc = CLASS->new( exporter => Local::Test->new ), object {
