@@ -84,7 +84,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method $create_span (%args) {
-        my %span = %args{qw( parent name kind start scope links )};
+        my %span = %args{qw( parent name kind start scope links resource )};
 
         $span{attribute_count_limit}  = $span_limits->attribute_count_limit;
         $span{attribute_length_limit} = $span_limits->attribute_length_limit;
@@ -125,7 +125,6 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
             );
 
             $span{context}    = $context;
-            $span{resource}   = $resource;
             $span{processors} = [ @span_processors ];
 
             return OpenTelemetry::SDK::Trace::Span->new(%span);
@@ -140,33 +139,48 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         );
     }
 
-    method tracer {
-        my $scope = $_[0] isa OpenTelemetry::SDK::InstrumentationScope
-            ? shift : do {
-                my %args = @_;
+    method tracer (%args) {
+        my %defaults;
 
-                # If no name is provided, we get it from the caller
-                # This has to override the version, since the version
-                # only makes sense for the name
-                $args{name} || do {
-                    ( $args{name} ) = caller;
-                    $args{version}  = $args{name}->VERSION;
-                };
-
-                OpenTelemetry->logger->warnf(
-                    "Got invalid tracer name when retrieving tracer: %s. Setting to 'null'",
-                    $args{name},
-                ) unless $args{name};
-
-                $args{name} //= 'null';
-
-                OpenTelemetry::SDK::InstrumentationScope
-                    ->new( %args{qw( name version )} );
+        $defaults{scope} = do {
+            # If no name is provided, we get it from the caller
+            # This has to override the version, since the version
+            # only makes sense for the name
+            $args{name} || do {
+                ( $args{name} ) = caller;
+                $args{version}  = $args{name}->VERSION;
             };
 
+            unless ( $args{name} ) {
+                OpenTelemetry->logger->warn(
+                    'Invalid name when retrieving tracer. Setting to empty string',
+                    { value => $args{name} },
+                );
+
+                $args{name} //= '';
+                delete $args{version};
+            }
+
+            OpenTelemetry::SDK::InstrumentationScope
+                ->new( %args{qw( name version attributes )} );
+        };
+
+        $defaults{resource} = $args{schema_url}
+            ? $resource->merge(
+                OpenTelemetry::SDK::Resource->empty(
+                    schema_url => $args{schema_url}
+                ),
+            )
+            : $resource;
+
         $registry_lock->enter( sub {
-            $registry{ $scope->to_string } //= OpenTelemetry::SDK::Trace::Tracer->new(
-                span_creator => sub { $self->$create_span( @_, scope => $scope ) },
+            my $key
+                = $defaults{scope}->to_string
+                . '-'
+                . $defaults{resource}->schema_url;
+
+            $registry{$key} //= OpenTelemetry::SDK::Trace::Tracer->new(
+                span_creator => sub { $self->$create_span( @_, %defaults ) },
             );
         });
     }

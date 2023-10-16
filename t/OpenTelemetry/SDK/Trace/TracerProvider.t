@@ -17,13 +17,8 @@ subtest Tracer => sub {
             object { prop isa => 'OpenTelemetry::SDK::Trace::Tracer';
         }, 'Can get tracer with name and version';
 
-        my $scope = OpenTelemetry::SDK::InstrumentationScope->new(
-            name    => 'foo',
-            version => 123,
-        );
-
-        ref_is $provider->tracer($scope), $specific,
-            'Can get tracer with scope and it is cached';
+        ref_is $provider->tracer( name => 'foo', version => 123 ), $specific,
+            'Equivalent request returns cached tracer provider';
     };
 };
 

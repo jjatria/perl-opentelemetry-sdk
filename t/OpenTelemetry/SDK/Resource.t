@@ -69,6 +69,18 @@ subtest New => sub {
             ] => 'Ignored unescaped ' . perlstring($_);;
         }
     };
+
+    subtest 'Empty' => sub {
+        is CLASS->empty, object {
+            call attributes => {};
+            call schema_url => '';
+        } => 'Can create empty resource';
+
+        is CLASS->empty( schema_url => 'foo' ), object {
+            call attributes => {};
+            call schema_url => 'foo';
+        } => 'Can set schema_url in empty resource';
+    };
 };
 
 subtest 'Attributes are not mutable' => sub {
