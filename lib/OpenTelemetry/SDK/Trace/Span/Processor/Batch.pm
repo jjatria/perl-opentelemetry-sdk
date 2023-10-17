@@ -38,10 +38,12 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         ) unless $exporter && $exporter->DOES('OpenTelemetry::Exporter');
 
         if ( $batch_size > $max_queue_size ) {
-            OpenTelemetry->logger->warnf(
-                'Max export batch size (%s) was greater than maximum queue size (%s) when instantiating batch processor',
-                $batch_size,
-                $max_queue_size,
+            OpenTelemetry->logger->warn(
+                'Max export batch size cannot be greater than maximum queue size when instantiating batch processor',
+                {
+                    batch_size => $batch_size,
+                    queue_size => $max_queue_size,
+                },
             );
             $batch_size = $max_queue_size;
         }
