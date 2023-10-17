@@ -4,6 +4,7 @@ use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Span::Processor::Batch';
 use Test2::Tools::Spec;
 use Test2::Tools::OpenTelemetry;
 
+use OpenTelemetry::Constants -trace_export;
 use Object::Pad;
 
 class Local::Test :does(OpenTelemetry::Exporter) {
@@ -30,6 +31,11 @@ class Local::Test :does(OpenTelemetry::Exporter) {
         }
 
         \@calls;
+    }
+
+    method reset {
+        open my $handle, '>', $path or die $!;
+        print $handle '';
     }
 
     method export      { $self->$log( export      => @_ ); 0 }
@@ -127,6 +133,22 @@ describe on_end => sub {
             is $exporter->calls, \@calls, 'Correct calls on exporter';
         };
     };
+};
+
+tests 'Ignore calls on shutdown' => sub {
+    my $processor = CLASS->new( exporter => my $exporter = Local::Test->new );
+
+    $processor->shutdown;
+    is $exporter->calls, [ [ 'shutdown' ] ], 'Calling shutdown propagates to exporter';
+    $exporter->reset;
+
+    is $processor->on_start(mock, mock), U, 'on_start returns nothing';
+    is $processor->on_end(mock),         U, 'on_end returns nothing';
+
+    is $processor->force_flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+    is $processor->shutdown->get,    TRACE_EXPORT_SUCCESS, 'shutdown returns success';
+
+    is $exporter->calls, [ ], 'No calls got to exporter after shutdown';
 };
 
 done_testing;
