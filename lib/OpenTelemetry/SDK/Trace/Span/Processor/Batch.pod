@@ -117,14 +117,16 @@ This method will also call L<"force_flush"|OpenTelemetry::Exporter/force_flush>
 on the configured exporter. It returns a L<Future> that will hold the result
 of that operation.
 
-Note: this is not yet implemented.
-
 =head2 shutdown
 
     $result = await $processor->shutdown( $timeout );
 
 Calls L<"shutdown"|OpenTelemetry::Exporter/shutdown> on the configured
 exporter and returns a L<Future> that will hold the result of that operation.
+
+Once the processor has been shutdown, any additional calls to L</shutdown>,
+L</force_flush> will do nothing and immediately return a success result. Calls
+to L</on_end> and L</on_start> will immediately return and do nothing.
 
 =head1 METRICS
 
@@ -158,14 +160,18 @@ Reported with the following attributes:
 
 The internal queue is full and can receive no more spans.
 
+=item C<export-failure>
+
+The exporter reported an error while exporting the spans.
+
 =item C<force-flush>
 
 The internal queue was flushed and not all queued spans could be exported in
 the specified time.
 
-=item C<export-failure>
+=item C<terminating>
 
-The exporter reported an error while exporting the spans.
+The processor was shutdown and some spans remained in its internal queue.
 
 =back
 

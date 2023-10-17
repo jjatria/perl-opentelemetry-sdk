@@ -91,14 +91,14 @@ describe on_end => sub {
             $sampled = 1;
             @calls = (
                 [ export   => [ 'snapshot', 'snapshot' ], 30_000 ],
-                [ shutdown => undef ],
+                [ 'shutdown' ],
             );
         };
 
         case 'Unsampled span' => sub {
             $sampled = 0;
             @calls = (
-                [ shutdown => undef ],
+                [ 'shutdown' ],
             );
         };
 
