@@ -79,59 +79,66 @@ describe Validation => sub {
 };
 
 describe on_end => sub {
-    my ( $sampled, @calls );
+    my ( $span, $sampled, @calls, @logs );
 
-    my $span = mock {} => add => [
-        snapshot => 'snapshot',
-        context  => sub {
-            mock {} => add => [
-                trace_flags => sub {
-                    mock {} => add => [ sampled => $sampled ];
-                },
-            ];
-        },
-    ];
+    before_case Reset => sub {
+        $sampled = 1;
+        @logs    = ();
+        @calls   = [ 'shutdown' ];
 
-    describe 'Valid cases' => sub {
-        case 'Sampled span' => sub {
-            $sampled = 1;
-            @calls = (
-                [ export   => [ 'snapshot', 'snapshot' ], 30_000 ],
-                [ 'shutdown' ],
-            );
-        };
+        $span = mock {} => add => [
+            snapshot => 'snapshot',
+            context  => sub {
+                mock {} => add => [
+                    trace_flags => sub {
+                        mock {} => add => [ sampled => $sampled ];
+                    },
+                ];
+            },
+        ];
+    };
 
-        case 'Unsampled span' => sub {
-            $sampled = 0;
-            @calls = (
-                [ 'shutdown' ],
-            );
-        };
+    case 'Sampled span' => sub {
+        @calls = (
+            [ export   => [ 'snapshot', 'snapshot' ], 30_000 ],
+            [ 'shutdown' ],
+        );
+    };
 
-        it Works => { flat => 1 } => sub {
-            local %ENV = (
-                OTEL_BSP_MAX_EXPORT_BATCH_SIZE => 2,
-                OTEL_BSP_MAX_QUEUE_SIZE        => 2,
-            );
+    case 'Unsampled span' => sub {
+        $sampled = 0;
+    };
 
-            my $exporter  = Local::Test->new;
-            my $processor = CLASS->new( exporter => $exporter );
+    case 'Unforeseen errors' => sub {
+        my ($mock) = mocked $span;
+        $mock->override( context => sub { die 'boom' } );
+        @logs = (
+            [ error => OpenTelemetry => match qr/unexpected error in .*on_end - boom/ ]
+        );
+    };
 
-            no_messages {
-                is $processor->on_end($span), U, 'Returns undefined';
-            };
+    it Works => { flat => 1 } => sub {
+        my $exporter  = Local::Test->new;
+        my $processor = CLASS->new(
+            batch_size => 2,
+            queue_size => 2,
+            exporter   => $exporter,
+        );
 
-            is $exporter->calls, [], 'Nothing exported yet';
+        is messages {
+            is $processor->on_end($span), U, 'Returns undefined';
+        } => \@logs, 'Logged expected messages';
 
-            no_messages {
-                is $processor->on_end($span), U, 'Returns undefined';
-            };
+        is $exporter->calls, [], 'Nothing exported yet';
 
-            # Make sure we wait before reading the calls
-            $processor->shutdown;
+        is messages {
+            is $processor->on_end($span), U, 'Returns undefined';
+        } => \@logs, 'Logged expected messages';
 
-            is $exporter->calls, \@calls, 'Correct calls on exporter';
-        };
+        # Make sure we wait before reading the calls
+        $processor->shutdown;
+
+        is $exporter->calls, \@calls, 'Correct calls on exporter';
     };
 };
 
