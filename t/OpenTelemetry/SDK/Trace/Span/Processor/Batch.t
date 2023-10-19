@@ -142,6 +142,40 @@ describe on_end => sub {
     };
 };
 
+tests 'Flush queue' => sub {
+    my $span = mock {} => add => [
+        snapshot => 'snapshot',
+        context  => sub {
+            mock {} => add => [
+                trace_flags => sub {
+                    mock {} => add => [ sampled => 1 ];
+                },
+            ];
+        },
+    ];
+
+    my $processor = CLASS->new(
+        batch_size => 4,
+        queue_size => 4,
+        exporter   => my $exporter = Local::Test->new,
+    );
+
+    $processor->on_end($span) for 1..3;
+
+    is metrics {
+        no_messages {
+            is $processor->force_flush->get, TRACE_EXPORT_SUCCESS,
+                'Flushing returns success';
+        };
+    } => bag {
+        item 'otel.bsp.export.success = 1';
+        item 'otel.bsp.exported_spans = 3';
+        etc;
+    }, 'Generated correct metrics';
+
+    $processor->shutdown;
+};
+
 tests 'Ignore calls on shutdown' => sub {
     my $processor = CLASS->new( exporter => my $exporter = Local::Test->new );
 
