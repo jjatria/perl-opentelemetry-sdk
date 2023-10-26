@@ -128,7 +128,8 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
             $lock->enter(
                 sub {
-                    if ( my $overflow = @queue + 1 - $max_queue_size ) {
+                    my $overflow = @queue + 1 - $max_queue_size;
+                    if ( $overflow > 0 ) {
                         # If the buffer is full, we drop old spans first
                         # The queue is always FIFO, even for dropped spans
                         # This behaviour is not in the spec, but is
@@ -142,7 +143,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
                         );
                     }
 
-                    push @queue, $span
+                    push @queue, $span;
                 }
             );
 
