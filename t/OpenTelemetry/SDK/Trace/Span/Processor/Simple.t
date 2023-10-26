@@ -4,7 +4,7 @@ use Test2::V0 -target => 'OpenTelemetry::SDK::Trace::Span::Processor::Simple';
 use Test2::Tools::Spec;
 use Test2::Tools::OpenTelemetry;
 
-use Object::Pad;
+use Object::Pad ':experimental(init_expr)';
 
 class Local::Test :does(OpenTelemetry::Exporter) {
     field $calls :reader = [];

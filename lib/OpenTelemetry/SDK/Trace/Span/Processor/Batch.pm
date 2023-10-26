@@ -51,7 +51,12 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             $batch_size = $max_queue_size;
         }
 
+        # This is a non-standard variable, so we make it Perl-specific
+        my $max_workers = $ENV{OTEL_PERL_BSP_MAX_WORKERS};
+
         $function = IO::Async::Function->new(
+            $max_workers ? ( max_workers => $max_workers ) : (),
+
             code => sub ( $exporter, $batch, $timeout ) {
                 $exporter->export( $batch, $timeout );
             },
@@ -173,6 +178,8 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         $self->$report_dropped_spans( +@queue, 'terminating' ) if @queue;
         @queue = ();
 
+        $function->stop->get if $function->workers;
+
         $exporter->shutdown( maybe_timeout $timeout, $start );
     }
 
@@ -214,6 +221,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     }
 
     method DESTROY {
-        $function->stop->get if $function && $function->workers;
+        try { $function->stop->get }
+        catch ($e) { }
     }
 }
