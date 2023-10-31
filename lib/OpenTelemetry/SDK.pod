@@ -375,6 +375,11 @@ L<OpenTelemetry::Exporter::Zipkin> (NYI)
 
 =back
 
+=head1 ACKNOWLEDGEMENTS
+
+Special thanks to L<CV-Library Ltd.|https://cv-library.co.uk> for their
+support in the development of this library.
+
 =head1 COPYRIGHT AND LICENSE
 
 This software is copyright (c) 2023 by José Joaquín Atria.
