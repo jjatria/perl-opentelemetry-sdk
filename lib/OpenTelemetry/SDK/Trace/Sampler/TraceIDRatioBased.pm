@@ -3,7 +3,7 @@ use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased;
 
-our $VERSION = '0.001';
+our $VERSION = '0.010';
 
 use OpenTelemetry::SDK::Trace::Sampler::Result;
 
