@@ -118,5 +118,5 @@ See [LICENSE] for more information.
 [badge]: https://coveralls.io/repos/github/jjatria/perl-opentelemetry-sdk/badge.svg?branch=main
 [coveralls]: https://coveralls.io/github/jjatria/perl-opentelemetry-sdk?branch=main
 [home]: https://opentelemetry.io
-[license]: https://github.com/jjatria/perl-opentelemetry/blob/main/LICENSE
+[license]: https://github.com/jjatria/perl-opentelemetry-sdk/blob/main/LICENSE
 [sig]: https://github.com/open-telemetry/community/issues/828
