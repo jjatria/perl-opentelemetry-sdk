@@ -229,6 +229,8 @@ Maximum allowed attribute count. Default: 128.
 This is used as the default value for L</OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT>,
 L</OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT>, and L</OTEL_LINK_ATTRIBUTE_COUNT_LIMIT>.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT
 
 Maximum allowed attribute value size. Default is to have no limit.
@@ -240,16 +242,22 @@ L</OTEL_LINK_ATTRIBUTE_VALUE_LENGTH_LIMIT> variables described below.
 Note that, of these, only the one for spans is defined by the
 OpenTelemetry standard specification.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT
 
 Maximum allowed attribute per span event count. Default: the value of
 L</OTEL_ATTRIBUTE_COUNT_LIMIT>.
+
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 =item OTEL_EVENT_ATTRIBUTE_VALUE_LENGTH_LIMIT
 
 Maximum allowed size for event attribute values. Default is to have no
 limit. If not set, but L</OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT> is, the
 latter will apply to event attributes as well.
+
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 This variable is non-standard.
 
@@ -258,11 +266,15 @@ This variable is non-standard.
 Maximum allowed attribute per span link count. Default: the value of
 L</OTEL_ATTRIBUTE_COUNT_LIMIT>.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_LINK_ATTRIBUTE_VALUE_LENGTH_LIMIT
 
 Maximum allowed size for link attribute values. Default is to have no
 limit. If not set, but L</OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT> is, the
 latter will apply to link attributes as well.
+
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 This variable is non-standard.
 
@@ -271,19 +283,27 @@ This variable is non-standard.
 Maximum allowed span attribute count. Default: the value of
 L</OTEL_ATTRIBUTE_COUNT_LIMIT>.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT
 
 Maximum allowed size for span attribute values. Default is to have no
 limit. If not set, but L</OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT> is, the
 latter will apply to span attributes as well.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_SPAN_EVENT_COUNT_LIMIT
 
 Maximum allowed span event count. Default: 128.
 
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
+
 =item OTEL_SPAN_LINK_COUNT_LIMIT
 
 Maximum allowed span link count. Default: 128.
+
+See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 =item OTEL_TRACES_EXPORTER
 
@@ -346,6 +366,8 @@ L<OpenTelemetry::Exporter::Zipkin> (NYI)
 =item L<OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased>
 
 =item L<OpenTelemetry::SDK::Trace::Span::Processor::Batch>
+
+=item L<OpenTelemetry::SDK::Trace::SpanLimits>
 
 =item L<OpenTelemetry::SDK::Trace::TracerProvider>
 
