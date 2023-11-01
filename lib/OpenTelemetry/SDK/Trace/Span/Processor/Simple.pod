@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-OpenTelemetry::SDK::Trace::Processor::Simple - A basic OpenTelemetry span processor
+OpenTelemetry::SDK::Trace::Span::Processor::Simple - A basic OpenTelemetry span processor
 
 =head1 SYNOPSIS
 

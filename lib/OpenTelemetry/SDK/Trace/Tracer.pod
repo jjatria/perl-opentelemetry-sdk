@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-package OpenTelemetry::SDK::Trace::Tracer - A Tracer for the OpenTelemetry SDK
+OpenTelemetry::SDK::Trace::Tracer - A Tracer for the OpenTelemetry SDK
 
 =head1 SYNOPSIS
 

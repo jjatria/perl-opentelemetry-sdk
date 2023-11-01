@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-OpenTelemetry::SDK::Trace::Processor::Batch - A batched OpenTelemetry span processor
+OpenTelemetry::SDK::Trace::Span::Processor::Batch - A batched OpenTelemetry span processor
 
 =head1 SYNOPSIS
 

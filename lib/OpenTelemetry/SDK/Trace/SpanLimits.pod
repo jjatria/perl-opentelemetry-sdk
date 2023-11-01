@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-package OpenTelemetry::SDK::Trace::SpanLimits - A class that governs the configuration of spans
+OpenTelemetry::SDK::Trace::SpanLimits - A class that governs the configuration of spans
 
 =head1 SYNOPSIS
 
