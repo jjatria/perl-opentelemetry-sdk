@@ -2,7 +2,7 @@ use Object::Pad ':experimental(init_expr)';
 # ABSTRACT: Represents the entity producing OpenTelemetry data
 package OpenTelemetry::SDK::Resource;
 
-our $VERSION = '0.010';
+our $VERSION = '0.011';
 
 class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
     use experimental 'isa';
