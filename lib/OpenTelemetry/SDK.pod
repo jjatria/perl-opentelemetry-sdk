@@ -141,6 +141,59 @@ See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 This variable is non-standard.
 
+=item OTEL_EXPORTER_OTLP_TRACES_COMPRESSION
+
+Controls the compression used by the OTLP exporter for trace data.
+Default: the value of L</OTEL_EXPORTER_OTLP_COMPRESSION>,
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_COMPRESSION
+
+Controls the compression used by the OTLP exporter. Default: depends
+on availability.
+
+Possible values are:
+
+=over
+
+=item C<none>
+
+No compression will be used.
+
+=item C<gzip>
+
+Compressed using zlib.
+
+=back
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_PROTOCOL
+
+Controls the protocol used by the OTLP exporter. Default: depends on
+availability.
+
+Possible values are:
+
+=over
+
+=item C<http/json>
+
+Sends data as JSON over HTTP.
+
+=item C<http/protobuf>
+
+Sends data as a Protobuf-encoded blob over HTTP.
+
+=item C<grpc> (NYI)
+
+Sends data using gRPC.
+
+=back
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
 =item OTEL_LINK_ATTRIBUTE_COUNT_LIMIT
 
 Maximum allowed attribute per span link count. Default: the value of
