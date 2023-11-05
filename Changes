@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.012     2023-11-05 18:33:22+00:00 Europe/London
 
     * Document environment variables for OTLP exporter
 
