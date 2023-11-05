@@ -130,7 +130,7 @@ to L</on_end> and L</on_start> will immediately return and do nothing.
 
 =head1 METRICS
 
-This exporter generates a number of metrics to keep track of its regular
+This processor generates a number of metrics to keep track of its regular
 operation. At the time of writing, these metrics are non-standard, but their
 inclusion in the standard
 L<is being discussed|https://github.com/open-telemetry/semantic-conventions/issues/83>.
