@@ -35,12 +35,20 @@ deferring the choice of concrete implementation to the application developer.
 
 ## How do I get started?
 
-Install this distribution from the repository (the aim is for it to be on CPAN
-at some point):
-
+Install this distribution from CPAN:
 ```
+cpanm OpenTelemetry::SDK
+```
+or directly from the repository if you want to install a development
+version (although note that only the CPAN version is recommended for
+production environments):
+```
+# On a local fork
 cd path/to/this/repo
 cpanm install .
+
+# Over the net
+cpanm https://github.com/jjatria/perl-opentelemetry-sdk.git
 ```
 
 Then, configure the SDK according to your desired handling of telemetry data,
@@ -102,12 +110,9 @@ check again soon, or try your hand at submitting some of your own.
 
 ## How can I get involved?
 
-For now, this distribution exists on Github only, together with some related
-distributions like [the API][api] implementation.
-
 We are in the process of setting up an OpenTelemetry-Perl special interest
 group (SIG). Until that is set up, you are free to [express your
-interest][sig] or join us in IRC.
+interest][sig] or join us in IRC on the #io-async channel in irc.perl.org.
 
 ## License
 
