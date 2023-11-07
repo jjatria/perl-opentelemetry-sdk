@@ -141,10 +141,25 @@ See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 This variable is non-standard.
 
-=item OTEL_EXPORTER_OTLP_TRACES_COMPRESSION
+=item OTEL_EXPORTER_OTLP_CERTIFICATE
 
-Controls the compression used by the OTLP exporter for trace data.
-Default: the value of L</OTEL_EXPORTER_OTLP_COMPRESSION>,
+Set to the path to a PEM file with the certificate used to verify
+a server's TLS credentials. Default: empty.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE
+
+Set to the path to a PEM file with the client certificate/chain trust
+for the client's private key to use in mTLS communication. Default:
+empty.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_CLIENT_KEY
+
+Set to the path to a PEM file with the client's private key to use in
+mTLS communication. Default: empty.
 
 See L<OpenTelemetry::Exporter::OTLP> for more details.
 
@@ -166,6 +181,21 @@ No compression will be used.
 Compressed using zlib.
 
 =back
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_ENDPOINT
+
+The base URL to be used when sending exported data. Default:
+C<http://localhost> with port 4318 for HTTP traffic, and port 4317 for
+gRPC traffic.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_HEADERS
+
+Set to a string with key/value pairs to be sent along with requests
+exporting trace data. Default: empty.
 
 See L<OpenTelemetry::Exporter::OTLP> for more details.
 
@@ -191,6 +221,67 @@ Sends data as a Protobuf-encoded blob over HTTP.
 Sends data using gRPC.
 
 =back
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TIMEOUT
+
+The maximum amount of time the OTLP exporter will wait for a response
+when exporting data. Default: 10.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE
+
+Set to the path to a PEM file with the certificate used to verify
+a server's TLS credentials when exporting trace data. Default: the
+value of L</OTEL_EXPORTER_OTLP_CERTIFICATE>.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE
+
+Set to the path to a PEM file with the client certificate/chain trust
+for the client's private key to use in mTLS communication when exporting
+trace data. Default: the value of L</OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE>.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY
+
+Set to the path to a PEM file with the client's private key to use in
+mTLS communication when exporting trace data. Default: the value of
+L</OTEL_EXPORTER_OTLP_CLIENT_KEY>.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_COMPRESSION
+
+Controls the compression used by the OTLP exporter for trace data.
+Default: the value of L</OTEL_EXPORTER_OTLP_COMPRESSION>,
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+
+The URL to send exported trace data. Default: the value of
+L</OTEL_EXPORTER_OTLP_ENDPOINT> with C</v1/traces> appended to it.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_HEADERS
+
+Set to a string with key/value pairs to be sent along with requests
+exporting trace data. Default: the value of
+L</OTEL_EXPORTER_OTLP_HEADERS>.
+
+See L<OpenTelemetry::Exporter::OTLP> for more details.
+
+=item OTEL_EXPORTER_OTLP_TRACES_TIMEOUT
+
+The maximum amount of time the OTLP exporter will wait for a response
+when exporting trace data. Default: the value of
+L</OTEL_EXPORTER_OTLP_TIMEOUT>.
 
 See L<OpenTelemetry::Exporter::OTLP> for more details.
 
