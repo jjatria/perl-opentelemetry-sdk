@@ -166,12 +166,39 @@ class OpenTelemetry::SDK::Trace::Span
     }
 
     method record_exception ( $exception, %attributes ) {
+        return $self unless $self->recording;
+
+        my ( $message, $stacktrace );
+        if ( $exception isa Exception::Class::Base ) {
+            $message    = $exception->message;
+            $stacktrace = $exception->trace->as_string;
+        }
+        else {
+            # This should cover the following common exceptions:
+            # * Catalyst::Exception::Basic
+            # * Class::Throwable
+            # * Dancer::Exception::Base
+            # * Exception::Base
+            # * Mojo::Exception
+            # * Throwable::Error
+            # * X::Tiny
+            # * plain die strings
+
+            local $ENV{MOJO_EXCEPTION_VERBOSE} = 1;
+            local $Class::Throwable::DEFAULT_VERBOSITY = 2;
+
+            ( $message, $stacktrace ) = split /\n/, "$exception", 2;
+
+            $stacktrace //= $exception->get_caller_stacktrace
+                if $exception isa Exception::Base;
+        }
+
         $self->add_event(
             name       => 'exception',
             attributes => {
-                'exception.type'       => ref $exception || '',
-                'exception.message'    => "$exception" =~ s/\n.*//r,
-                'exception.stacktrace' => "$exception",
+                'exception.type'       => ref $exception || 'string',
+                'exception.message'    => $message,
+                'exception.stacktrace' => $stacktrace,
                 %attributes,
             }
         );
