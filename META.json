@@ -145,7 +145,7 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "https://gitlab.com/jjatria/perl-opentelemetry-sdk/issues"
+         "web" : "https://github.com/jjatria/perl-opentelemetry-sdk/issues"
       },
       "repository" : {
          "type" : "git",

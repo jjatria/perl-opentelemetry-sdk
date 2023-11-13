@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Fix link to issues in meta
+
 0.014     2023-11-09 00:05:28+00:00 Europe/London
 
     * Handle more error classes in span's 'record_exception'
