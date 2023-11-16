@@ -4,8 +4,6 @@ package OpenTelemetry::SDK::Trace::Span;
 
 our $VERSION = '0.029';
 
-use OpenTelemetry::Attributes;
-
 class OpenTelemetry::SDK::Trace::Span
     :isa(OpenTelemetry::Trace::Span)
     :does(OpenTelemetry::Attributes)
