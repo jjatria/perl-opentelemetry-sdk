@@ -2,6 +2,10 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Do not warn if ending an ended span. This is to support the use
+      case of a user manually ending the span automatically created by
+      the Tracer's in_span method.
+
 0.015     2023-11-17 00:00:04+00:00 Europe/London
 
     * Fix link to issues in meta

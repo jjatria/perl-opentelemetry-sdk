@@ -158,13 +158,11 @@ subtest End => sub {
         call sub { shift->snapshot->end_timestamp } => 123;
     }, 'Ended span with timestamp';
 
-    is messages {
+    no_messages {
         is CLASS->new( name => 'foo', scope => $scope )->end(1)->end(2), object {
             call sub { shift->snapshot->end_timestamp } => 1;
         }, 'Second end is ignored';
-    } => [
-        [ warning => OpenTelemetry => match qr/end on an ended Span/ ],
-    ], 'Logged end on an ended span';
+    };
 };
 
 subtest 'Set status' => sub {

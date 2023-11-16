@@ -152,11 +152,7 @@ class OpenTelemetry::SDK::Trace::Span
         $time //= time;
 
         return $self unless $lock->enter( sub {
-            unless ($self->recording) {
-                $logger->warn('Calling end on an ended Span');
-                return;
-            }
-
+            return unless $self->recording;
             $end = $time;
         });
 
