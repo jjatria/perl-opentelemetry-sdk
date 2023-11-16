@@ -3,6 +3,14 @@ Revision history for OpenTelemetry-SDK
 {{$NEXT}}
 
     * Add initial support for programmatic configuration
+    * EXPERIMENTAL: Add support for logs
+    * BREAKING CHANGE: The batch exporter metrics have changed name.
+      The metrics stored under 'otel.bsp' are now stored under
+      'otel.processor.batch'. Their meanings and values remain the same.
+      Please refer to the documentation of
+      OpenTelemetry::SDK::Trace::Span::Processor::Batch and
+      OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch for more
+      details.
 
 0.027     2025-05-08 08:50:57 BST
 
