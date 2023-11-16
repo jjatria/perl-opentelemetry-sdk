@@ -32,7 +32,6 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
     field $done;
     field $function;
-    field @futures;
     field @queue;
 
     ADJUST {
