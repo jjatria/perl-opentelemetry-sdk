@@ -13,6 +13,7 @@ use Module::Runtime;
 require OpenTelemetry::SDK;
 
 my $tracer_provider_mock = mock 'OpenTelemetry::SDK::Trace::TracerProvider';
+my $logger_provider_mock = mock 'OpenTelemetry::SDK::Logs::LoggerProvider';
 my         $require_mock = mock 'Module::Runtime';
 
 my ( $propagator, $tracer_provider );
@@ -39,6 +40,7 @@ it 'Can be disabled' => sub {
 
 it 'Dies on broken modules' => sub {
     local %ENV = (
+        OTEL_LOGS_EXPORTER   => 'console',
         OTEL_TRACES_EXPORTER => 'console',
         OTEL_PROPAGATORS     => 'baggage',
     );
@@ -102,7 +104,7 @@ describe 'Propagators' => sub {
                 OTEL_PROPAGATORS     => $env,
             );
 
-            no_messages { OpenTelemetry::SDK->import };
+            no_messages { OpenTelemetry::SDK->configure_propagators };
 
             is $propagator, object {
                 prop isa => 'OpenTelemetry::Propagator::Composite';
@@ -117,7 +119,7 @@ describe 'Propagators' => sub {
             OTEL_PROPAGATORS     => 'foo',
         );
 
-        is messages { OpenTelemetry::SDK->import }, [
+        is messages { OpenTelemetry::SDK->configure_propagators }, [
             [ warning => OpenTelemetry => match qr/Unknown propagator 'foo'/ ],
         ], 'Logged unknown propagator';
 
@@ -132,29 +134,33 @@ describe 'Span processors' => sub {
     my ( $env, $processor, $exporter, @keys );
 
     before_all Mock => sub {
+        $tracer_provider_mock->track(1);
         $tracer_provider_mock->override(
-            new => sub {
-                mock {} => track => 1;
-            },
+            add_span_processor => sub { },
         );
     };
 
-    after_all 'Clear mock' => sub {
+    before_each 'Reset call tracking' => sub {
+        $tracer_provider_mock->clear_call_tracking;
+    };
+
+    after_all Reset => sub {
         $tracer_provider_mock->reset_all;
     };
 
     describe Valid => sub {
-
         case Console => sub {
             $env       = 'console';
             $exporter  = 'OpenTelemetry::SDK::Exporter::Console';
             $processor = 'OpenTelemetry::SDK::Trace::Span::Processor::Simple';
         };
 
-        it 'Works' => sub {
-            local %ENV = ( OTEL_TRACES_EXPORTER => $env );
+        it 'Works' => { flat => 1 } => sub {
+            local %ENV = (
+                OTEL_TRACES_EXPORTER => $env,
+            );
 
-            no_messages { OpenTelemetry::SDK->import };
+            no_messages { OpenTelemetry::SDK->configure_tracer_provider };
 
             my ($tracker) = mocked $tracer_provider;
             is $tracker->call_tracking, [
@@ -166,7 +172,8 @@ describe 'Span processors' => sub {
                         object {
                             prop isa  => $processor;
                             call sub {
-                                Object::Pad::MOP::Class->for_class($processor)
+                                my $class = $processor =~ s/::SDK::Trace::Span//r;
+                                Object::Pad::MOP::Class->for_class($class)
                                     ->get_field('$exporter')
                                     ->value(shift);
                             } => object {
@@ -182,7 +189,7 @@ describe 'Span processors' => sub {
     tests None => sub {
         local %ENV = ( OTEL_TRACES_EXPORTER => 'none' );
 
-        no_messages { OpenTelemetry::SDK->import };
+        no_messages { OpenTelemetry::SDK->configure_tracer_provider };
 
         my ($tracker) = mocked $tracer_provider;
         is $tracker->call_tracking, [], 'Ignored processor';
@@ -191,7 +198,7 @@ describe 'Span processors' => sub {
     tests Unknown => sub {
         local %ENV = ( OTEL_TRACES_EXPORTER => 'foo' );
 
-        is messages { OpenTelemetry::SDK->import }, [
+        is messages { OpenTelemetry::SDK->configure_tracer_provider }, [
             [ warning => OpenTelemetry => match qr/Unknown exporter 'foo'/ ],
         ], 'Logged unknown exporter';
 
