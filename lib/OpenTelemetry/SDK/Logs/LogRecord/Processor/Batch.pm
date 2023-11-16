@@ -1,15 +1,17 @@
 use Object::Pad ':experimental(init_expr)';
-# ABSTRACT: A batched OpenTelemetry span processor
+# ABSTRACT: A batched OpenTelemetry log record processor
 
-package OpenTelemetry::SDK::Trace::Span::Processor::Batch;
+package OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch;
 
-our $VERSION = '0.022';
+our $VERSION = '0.014';
 
-class OpenTelemetry::SDK::Trace::Span::Processor::Batch
+class OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch
     :isa(OpenTelemetry::Processor::Batch)
-    :does(OpenTelemetry::Trace::Span::Processor)
+    :does(OpenTelemetry::Logs::LogRecord::Processor)
 {
+    use Feature::Compat::Try;
     use OpenTelemetry::Constants -export;
+    use OpenTelemetry;
 
     use Metrics::Any '$metrics', strict => 1,
         name_prefix => [qw( otel processor batch )];
@@ -33,6 +35,13 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         description => 'Number of spans that were successfully processed',
     );
 
+    # FIXME: Experimenting here with different metric names.
+    # This is probably something we are going to have to do
+    # sooner or later, because the ones we copied from Ruby
+    # are incompatible with eg. Prometheus.
+    # Note that these are _not_ the same metrics that are
+    # proposed on the specification issue, but these seem to
+    # make sense for now.
     method report_dropped ( $reason, $count ) {
         $metrics->inc_counter_by( dropped => $count => [ reason => $reason ] );
         $self;
@@ -42,20 +51,16 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         if ( $result == EXPORT_RESULT_SUCCESS ) {
             $metrics->inc_counter('success');
             $metrics->inc_counter_by( processed => $count );
-        }
-        else {
-            $metrics->inc_counter('failure');
-            $self->report_dropped( 'export-failure' => $count );
+            return $self;
         }
 
-        return $result;
+        $metrics->inc_counter('failure');
+        $self->report_dropped( 'export-failure' => $count );
     }
 
-    method on_start ( $span, $context ) { }
-
-    method on_end ($span) {
+    method on_emit ($log) {
         return if $self->done;
-        return unless $span->context->trace_flags->sampled;
-        $self->process( $span->snapshot );
+        $self->process($log);
+        return;
     }
 }

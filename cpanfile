@@ -1,3 +1,4 @@
+requires 'Const::Fast';
 requires 'Feature::Compat::Try';
 requires 'Future::AsyncAwait', '0.38'; # Object::Pad compatibility
 requires 'IO::Async::Loop';
