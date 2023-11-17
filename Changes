@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.015     2023-11-17 00:00:04+00:00 Europe/London
 
     * Fix link to issues in meta
 
