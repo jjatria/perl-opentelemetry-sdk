@@ -12,7 +12,6 @@ class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
 {
     use OpenTelemetry;
     use Scalar::Util 'looks_like_number';
-    use String::CRC32 'crc32';
 
     field $threshold;
     field $ratio       :param = 1;
