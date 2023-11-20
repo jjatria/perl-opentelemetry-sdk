@@ -79,7 +79,7 @@ use OpenTelemetry::SDK;
 #
 # OpenTelemetry->tracer_provider->add_span_processor(
 #     OpenTelemetry::SDK::Trace::Span::Processor::Simple->new(
-#         OpenTelemetry::SDK::Exporter::Console->new
+#         exporter => OpenTelemetry::SDK::Exporter::Console->new
 #     ),
 # );
 #
