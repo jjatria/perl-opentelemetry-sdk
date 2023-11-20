@@ -52,7 +52,9 @@ class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
         # in the range from 0 (never sample) to 2**64 (always sample)
         $threshold = do {
             use bignum;
-            ( $ratio * 1 << 64 )->bceil;
+            # Since Math::BigFloat 1.999840 onwards, the shift operators are
+            # exclusively integer-based, so we enforce precedent here
+            ( $ratio * ( 1 << 64 ) )->bceil;
         };
     }
 
