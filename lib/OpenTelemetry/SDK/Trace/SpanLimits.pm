@@ -3,7 +3,7 @@ use Object::Pad ':experimental( init_expr mop )';
 
 package OpenTelemetry::SDK::Trace::SpanLimits;
 
-our $VERSION = '0.017';
+our $VERSION = '0.018';
 
 class OpenTelemetry::SDK::Trace::SpanLimits {
     use Ref::Util 'is_arrayref';
