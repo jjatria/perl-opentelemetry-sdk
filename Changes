@@ -2,6 +2,10 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Support recent versions of bignum, which broke
+      OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
+      (https://github.com/jjatria/perl-opentelemetry-sdk/issues/2)
+
 0.016     2023-11-19 11:42:51+00:00 Europe/London
 
     * Do not warn if ending an ended span. This is to support the use
