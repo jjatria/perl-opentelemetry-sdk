@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.018     2023-11-21 21:42:57+00:00 Europe/London
 
     * Ensure shutdown and force_flush calls on the TracerProvider
       wait for the resuts of propagating those calls down to the
