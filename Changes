@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Validate span processors when adding them to the TracerProvider
+
 0.018     2023-11-21 21:42:57+00:00 Europe/London
 
     * Ensure shutdown and force_flush calls on the TracerProvider
