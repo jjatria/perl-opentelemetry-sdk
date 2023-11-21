@@ -51,7 +51,7 @@
             "Metrics::Any" : "0",
             "Mutex" : "0",
             "Object::Pad" : "0.74",
-            "OpenTelemetry" : "0",
+            "OpenTelemetry" : "0.010",
             "perl" : "v5.32.0"
          }
       },

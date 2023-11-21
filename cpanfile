@@ -5,7 +5,7 @@ requires 'IO::Async::Loop';
 requires 'Metrics::Any';
 requires 'Mutex';
 requires 'Object::Pad', '0.74'; # For //= field initialisers
-requires 'OpenTelemetry';
+requires 'OpenTelemetry', '0.010';
 
 recommends 'OpenTelemetry::Exporter::OTLP';
 
