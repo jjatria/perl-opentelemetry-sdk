@@ -174,7 +174,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         # times out. Is this correct?
         await $self->force_flush( maybe_timeout $timeout, $start );
 
-        $self->$report_dropped_spans( +@queue, 'terminating' ) if @queue;
+        $self->$report_dropped_spans( scalar @queue, 'terminating' ) if @queue;
         @queue = ();
 
         $function->stop->get if $function->workers;
@@ -193,7 +193,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             # If we still have any spans left it has to be because we
             # timed out and couldn't export them. In that case, we drop
             # them and report
-            $self->$report_dropped_spans( +@stack, 'force-flush' ) if @stack;
+            $self->$report_dropped_spans( scalar @stack, 'force-flush' ) if @stack;
         }
 
         while ( @stack ) {
