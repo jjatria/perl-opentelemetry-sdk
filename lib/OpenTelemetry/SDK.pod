@@ -395,7 +395,30 @@ See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 Trace exporter to be used. Default: C<otlp>.
 
+This can be set to a comma-separated list of values, to set multiple
+exporters. They will be deduplicated before configuration takes place.
+
 Possible values (and the classes that represent them) are listed below:
+
+=over
+
+=item C<otlp>
+
+L<OpenTelemetry::Exporter::OTLP>
+
+=item C<zipkin>
+
+L<OpenTelemetry::Exporter::Zipkin> (NYI)
+
+=item C<console>
+
+L<OpenTelemetry::SDK::Exporter::Console>
+
+This value is non-standard.
+
+=item none
+
+=back
 
 =item OTEL_TRACES_SAMPLER
 
@@ -454,20 +477,6 @@ argument is. Defaults to empty.
 
 This will only be used if L</OTEL_TRACES_SAMPLER> is set, and if the sampler
 requires it. Invalid or unrecognised input will be logged and will be ignored.
-
-=over
-
-=item C<otlp>
-
-L<OpenTelemetry::Exporter::OTLP>
-
-=item C<zipkin>
-
-L<OpenTelemetry::Exporter::Zipkin> (NYI)
-
-=item none
-
-=back
 
 =back
 
