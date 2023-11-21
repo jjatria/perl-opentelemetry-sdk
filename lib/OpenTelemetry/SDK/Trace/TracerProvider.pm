@@ -185,7 +185,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         });
     }
 
-    async method $atomic_call_on_processors ( $method, $timeout ) {
+    method $atomic_call_on_processors ( $method, $timeout ) {
         my $start = timeout_timestamp;
 
         my $result = TRACE_EXPORT_SUCCESS;
@@ -193,16 +193,15 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         for my $processor ( @span_processors ) {
             my $remaining = maybe_timeout $timeout, $start;
 
-            if ( defined $remaining && $remaining == 0 ) {
+            if ( $timeout && ! $remaining ) {
                 $result = TRACE_EXPORT_TIMEOUT;
                 last;
             }
 
-            my $res = $processor->$method($remaining);
+            my $res = $processor->$method($remaining)->get;
             $result = $res if $res > $result;
         }
 
-        $stopped = 1;
 
         return $result;
     }
@@ -215,6 +214,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
         $lock->enter(
             sub {
+                $stopped = 1;
                 $self->$atomic_call_on_processors( 'shutdown', $timeout );
             }
         );
@@ -239,7 +239,6 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         $lock->enter(
             sub {
                 push @span_processors, $processor;
-                Future->done;
             }
         );
 
