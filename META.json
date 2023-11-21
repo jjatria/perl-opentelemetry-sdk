@@ -45,7 +45,6 @@
          },
          "requires" : {
             "Feature::Compat::Try" : "0",
-            "Future" : "0.26",
             "Future::AsyncAwait" : "0.38",
             "IO::Async::Loop" : "0",
             "Metrics::Any" : "0",

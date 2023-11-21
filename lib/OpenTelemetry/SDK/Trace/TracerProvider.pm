@@ -9,8 +9,6 @@ use OpenTelemetry;
 
 class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::TracerProvider) {
     use Feature::Compat::Try;
-    use Future::AsyncAwait;
-    use Future;
     use List::Util 'any';
     use Mutex;
 
