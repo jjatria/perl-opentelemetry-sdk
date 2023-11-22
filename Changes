@@ -3,6 +3,8 @@ Revision history for OpenTelemetry-SDK
 {{$NEXT}}
 
     * Validate span processors when adding them to the TracerProvider
+    * Shutting down a TracerProvider that has been shutdown is not
+      en error and no longer warns
 
 0.018     2023-11-21 21:42:57+00:00 Europe/London
 

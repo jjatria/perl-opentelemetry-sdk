@@ -206,10 +206,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     }
 
     method shutdown ( $timeout = undef ) {
-        if ( $stopped ) {
-            OpenTelemetry->logger->warn('Attempted to shutdown a TraceProvider more than once');
-            return TRACE_EXPORT_FAILURE;
-        }
+        return TRACE_EXPORT_SUCCESS if $stopped;
 
         $lock->enter(
             sub {
