@@ -22,6 +22,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     use Metrics::Any '$metrics', strict => 0;
     my $logger = OpenTelemetry->logger;
 
+    field $use_workers      :param //= config('BSP_USE_WORKERS')           //      1;
     field $batch_size       :param //= config('BSP_MAX_EXPORT_BATCH_SIZE') //    512;
     field $exporter_timeout :param //= config('BSP_EXPORT_TIMEOUT')        // 30_000;
     field $max_queue_size   :param //= config('BSP_MAX_QUEUE_SIZE')        //  2_048;
@@ -50,23 +51,25 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             $batch_size = $max_queue_size;
         }
 
-        # This is a non-standard variable, so we make it Perl-specific
-        my $max_workers = $ENV{OTEL_PERL_BSP_MAX_WORKERS};
+        if($use_workers) {
+            # This is a non-standard variable, so we make it Perl-specific
+            my $max_workers = $ENV{OTEL_PERL_BSP_MAX_WORKERS};
 
-        $function = IO::Async::Function->new(
-            $max_workers ? ( max_workers => $max_workers ) : (),
+            $function = IO::Async::Function->new(
+                $max_workers ? ( max_workers => $max_workers ) : (),
 
-            code => sub ( $exporter, $batch, $timeout ) {
-                $exporter->export( $batch, $timeout );
-            },
-        );
+                code => sub ( $exporter, $batch, $timeout ) {
+                    $exporter->export( $batch, $timeout );
+                },
+            );
 
-        IO::Async::Loop->new->add($function);
+            IO::Async::Loop->new->add($function);
 
-        # TODO: Should this be made configurable? The Ruby SDK
-        # allows users to not start the thread on boot, although
-        # this is not standard
-        $function->start;
+            # TODO: Should this be made configurable? The Ruby SDK
+            # allows users to not start the thread on boot, although
+            # this is not standard
+            $function->start;
+        }
     }
 
     method $report_dropped_spans ( $count, $reason ) {
@@ -109,15 +112,23 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
         return unless @$batch;
 
-        $function->call(
-            args => [ $exporter, $batch, $exporter_timeout ],
-            on_result => sub ( $type, $result ) {
-                return $self->$report_result( TRACE_EXPORT_FAILURE, $batch )
+        if($use_workers) {
+            $function->call(
+                args => [ $exporter, $batch, $exporter_timeout ],
+                on_result => sub ( $type, $result ) {
+                    return $self->$report_result( TRACE_EXPORT_FAILURE, $batch )
                     unless $type eq 'return';
 
-                $self->$report_result( $result, $batch );
-            },
-        );
+                    $self->$report_result( $result, $batch );
+                },
+            );
+        } else {
+            my ($type, $result) = $exporter->export( $batch, $exporter_timeout );
+            return $self->$report_result( TRACE_EXPORT_FAILURE, $batch )
+                unless $type eq 'return';
+
+            $self->$report_result( $result, $batch );
+        }
 
         return;
     }
@@ -177,7 +188,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
         $self->$report_dropped_spans( scalar @queue, 'terminating' ) if @queue;
         @queue = ();
 
-        $function->stop->get if $function->workers;
+        await $function->stop if $use_workers and $function->workers;
 
         $exporter->shutdown( maybe_timeout $timeout, $start );
     }
@@ -203,13 +214,21 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             my $batch = [ map $_->snapshot, splice @stack, 0, $batch_size ];
 
             try {
-                my $result = await $function->call(
-                    args => [ $exporter, $batch, $remaining ],
-                );
+                if ( $use_workers ) {
+                    my $result = await $function->call(
+                        args => [ $exporter, $batch, $remaining ],
+                    );
 
-                $self->$report_result( $result, $batch );
+                    $self->$report_result( $result, $batch );
 
-                return $result unless $result == TRACE_EXPORT_SUCCESS;
+                    return $result unless $result == TRACE_EXPORT_SUCCESS;
+                } else {
+                    my $result = $exporter->export( $batch, $remaining );
+
+                    $self->$report_result( $result, $batch );
+
+                    return $result unless $result == TRACE_EXPORT_SUCCESS;
+                }
             }
             catch ($e) {
                 return $self->$report_result( TRACE_EXPORT_FAILURE, $batch );
@@ -220,7 +239,11 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     }
 
     method DESTROY {
-        try { $function->stop->get }
+        try {
+            return unless $use_workers;
+            my $f = $function->stop;
+            $f->get unless ${^GLOBAL_PHASE} eq 'DESTRUCT';
+        }
         catch ($e) { }
     }
 }

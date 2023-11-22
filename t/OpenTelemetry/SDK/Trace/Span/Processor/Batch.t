@@ -195,7 +195,7 @@ tests 'Flush queue' => sub {
 tests 'Ignore calls on shutdown' => sub {
     my $processor = CLASS->new( exporter => my $exporter = Local::Test->new );
 
-    $processor->shutdown;
+    $processor->shutdown->get;
     is $exporter->calls, [ [ 'shutdown' ] ], 'Calling shutdown propagates to exporter';
     $exporter->reset;
 
