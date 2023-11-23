@@ -16,7 +16,6 @@ class OpenTelemetry::SDK::Trace::Span
     use experimental 'isa';
 
     use List::Util qw( any pairs );
-    use Mutex;
     use Ref::Util qw( is_arrayref is_hashref );
     use Time::HiRes 'time';
 
@@ -36,7 +35,6 @@ class OpenTelemetry::SDK::Trace::Span
     field $end;
     field $kind       :param   = INTERNAL;
     field $limits     :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
-    field $lock                = Mutex->new;
     field $name       :param;
     field $resource   :param   = undef;
     field $scope      :param;
@@ -149,12 +147,11 @@ class OpenTelemetry::SDK::Trace::Span
     }
 
     method end ( $time = undef ) {
-        $time //= time;
-
-        return $self unless $lock->enter( sub {
-            return unless $self->recording;
-            $end = $time;
-        });
+        # This should in theory be an atomic check. For now, to reduce
+        # the chances of it becoming a problem, we check the field
+        # directly instead of going through `recording`
+        return $self if defined $end;
+        $end = $time // time;
 
         $_->on_end($self) for @processors;
 
