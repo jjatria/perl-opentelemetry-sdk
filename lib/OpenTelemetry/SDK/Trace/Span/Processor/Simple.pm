@@ -39,10 +39,10 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
     }
 
     async method shutdown ( $timeout = undef ) {
-        $exporter->shutdown( $timeout );
+        await $exporter->shutdown( $timeout );
     }
 
     async method force_flush ( $timeout = undef ) {
-        $exporter->force_flush( $timeout );
+        await $exporter->force_flush( $timeout );
     }
 }

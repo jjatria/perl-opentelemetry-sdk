@@ -6,6 +6,7 @@ Revision history for OpenTelemetry-SDK
     * Shutting down a TracerProvider that has been shutdown is not
       en error and no longer warns
     * Add documentation for TracerProvider's add_span_processor
+    * Make all shutdown and force_flush methods async for consistency
 
 0.018     2023-11-21 21:42:57+00:00 Europe/London
 

@@ -9,12 +9,11 @@ use OpenTelemetry;
 
 class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::TracerProvider) {
     use Feature::Compat::Try;
+    use Future::AsyncAwait;
     use List::Util 'any';
     use Mutex;
-
-    use OpenTelemetry::Constants -trace_export;
-
     use OpenTelemetry::Common qw( config timeout_timestamp maybe_timeout );
+    use OpenTelemetry::Constants -trace_export;
     use OpenTelemetry::Propagator::TraceContext::TraceFlags;
     use OpenTelemetry::SDK::InstrumentationScope;
     use OpenTelemetry::SDK::Resource;
@@ -33,9 +32,9 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     field $id_generator :param = 'OpenTelemetry::Trace';
     field $span_limits  :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
     field $resource     :param //= OpenTelemetry::SDK::Resource->new;
-    field $stopped             = 0;
+    field $stopped;
     field %registry;
-    field @span_processors;
+    field @processors;
 
     field $lock          //= Mutex->new;
     field $registry_lock //= Mutex->new;
@@ -124,7 +123,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
             );
 
             $span{context}    = $context;
-            $span{processors} = [ @span_processors ];
+            $span{processors} = [ @processors ];
 
             return OpenTelemetry::SDK::Trace::Span->new(%span);
         }
@@ -189,7 +188,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
         my $result = TRACE_EXPORT_SUCCESS;
 
-        for my $processor ( @span_processors ) {
+        for my $processor ( @processors ) {
             my $remaining = maybe_timeout $timeout, $start;
 
             if ( $timeout && ! $remaining ) {
@@ -205,23 +204,23 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
         return $result;
     }
 
-    method shutdown ( $timeout = undef ) {
+    async method shutdown ( $timeout = undef ) {
         return TRACE_EXPORT_SUCCESS if $stopped;
 
         $lock->enter(
             sub {
                 $stopped = 1;
-                $self->$atomic_call_on_processors( 'shutdown', $timeout );
+                $self->$atomic_call_on_processors( shutdown => $timeout );
             }
         );
     }
 
-    method force_flush ( $timeout = undef ) {
+    async method force_flush ( $timeout = undef ) {
         return TRACE_EXPORT_SUCCESS if $stopped;
 
         $lock->enter(
             sub {
-                $self->$atomic_call_on_processors( 'force_flush', $timeout );
+                $self->$atomic_call_on_processors( force_flush => $timeout );
             }
         );
     }
@@ -240,9 +239,9 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
             return OpenTelemetry->logger
                 ->warn("Attempted to add a $candidate span processor to a TraceProvider more than once")
-                if any { $_ isa $candidate } @span_processors;
+                if any { $_ isa $candidate } @processors;
 
-            push @span_processors, $processor;
+            push @processors, $processor;
         });
 
         $self;

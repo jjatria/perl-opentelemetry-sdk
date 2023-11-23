@@ -8,9 +8,10 @@ our $VERSION = '0.019';
 class OpenTelemetry::SDK::Exporter::Console
     :does(OpenTelemetry::Exporter)
 {
-    use feature 'say';
-
+    use Future::AsyncAwait;
     use OpenTelemetry::Constants -trace_export;
+
+    use feature 'say';
 
     field $handle :param = \*STDERR;
     field $stopped;
@@ -83,10 +84,10 @@ class OpenTelemetry::SDK::Exporter::Console
         TRACE_EXPORT_SUCCESS;
     }
 
-    method shutdown ( $timeout = undef ) {
+    async method shutdown ( $timeout = undef ) {
         $stopped = 1;
         TRACE_EXPORT_SUCCESS;
     }
 
-    method force_flush ( $timeout = undef ) { TRACE_EXPORT_SUCCESS }
+    async method force_flush ( $timeout = undef ) { TRACE_EXPORT_SUCCESS }
 }

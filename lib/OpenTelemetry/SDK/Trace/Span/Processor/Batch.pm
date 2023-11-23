@@ -179,7 +179,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
 
         $function->stop->get if $function->workers;
 
-        $exporter->shutdown( maybe_timeout $timeout, $start );
+        await $exporter->shutdown( maybe_timeout $timeout, $start );
     }
 
     async method force_flush ( $timeout = undef ) {
@@ -216,7 +216,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             }
         }
 
-        $exporter->force_flush( maybe_timeout $timeout, $start );
+        await $exporter->force_flush( maybe_timeout $timeout, $start );
     }
 
     method DESTROY {
