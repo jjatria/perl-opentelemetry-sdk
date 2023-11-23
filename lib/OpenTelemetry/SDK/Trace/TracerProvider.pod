@@ -123,6 +123,16 @@ the L</schema_url> resulting from the merge described above. The generated
 tracer instance will be cached internally, and any combination of parameters
 that would result in an equivalent set will receive that same tracer instance.
 
+=head2 add_span_processor
+
+    $tracer_provider = $tracer_provider->add_span_processor($processor);
+
+Takes an instance of a class that implements the
+L<OpenTelemetry::Trace::Span::Processor> role and registers it as a span
+processor for spans created by the tracers this tracer provider generates.
+
+This method is chainable.
+
 =head1 SEE ALSO
 
 =over
