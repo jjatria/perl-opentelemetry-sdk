@@ -19,8 +19,34 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     use OpenTelemetry::X;
     use OpenTelemetry;
 
-    use Metrics::Any '$metrics', strict => 0;
     my $logger = OpenTelemetry->logger;
+
+    use Metrics::Any '$metrics', strict => 1,
+        name_prefix => [qw( otel bsp )];
+
+    $metrics->make_counter( 'failure',
+        description => 'Number of times the span processing pipeline failed irrecoverably',
+    );
+
+    $metrics->make_counter( 'success',
+        description => 'Number of spans that were successfully processed',
+    );
+
+    $metrics->make_counter( 'dropped',
+        name        => [qw( spans dropped )],
+        description => 'Number of spans that could not be processed and were dropped',
+        labels      => [qw( reason )],
+    );
+
+    $metrics->make_counter( 'processed',
+        name        => [qw( spans processed )],
+        description => 'Number of spans that were successfully processed',
+    );
+
+    $metrics->make_gauge( 'buffer_use',
+        name        => [qw( buffer utilization )],
+        description => 'Number of spans that could not be processed and were dropped',
+    );
 
     field $batch_size       :param //= config('BSP_MAX_EXPORT_BATCH_SIZE') //    512;
     field $exporter_timeout :param //= config('BSP_EXPORT_TIMEOUT')        // 30_000;
@@ -70,15 +96,13 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     }
 
     method $report_dropped_spans ( $reason, $count ) {
-        $metrics->inc_counter_by(
-            'otel.bsp.dropped_spans' => $count, { reason => $reason },
-        );
+        $metrics->inc_counter_by( dropped => $count, [ reason => $reason ] );
     }
 
     method $report_result ( $code, $count ) {
         if ( $code == TRACE_EXPORT_SUCCESS ) {
-            $metrics->inc_counter('otel.bsp.export.success');
-            $metrics->inc_counter_by( 'otel.bsp.exported_spans' => $count );
+            $metrics->inc_counter('success');
+            $metrics->inc_counter_by( processed => $count );
             return;
         }
 
@@ -88,7 +112,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
             ),
         );
 
-        $metrics->inc_counter('otel.bsp.export.failure');
+        $metrics->inc_counter('failure');
         $self->$report_dropped_spans( 'export-failure' => $count );
     }
 
@@ -98,7 +122,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
                 return [] if @queue < $batch_size && !$force;
 
                 $metrics->set_gauge_to(
-                    'otel.bsp.buffer_utilization' => @queue / $max_queue_size,
+                    buffer_use => @queue / $max_queue_size,
                 ) if @queue;
 
                 [ map $_->snapshot, splice @queue, 0, $batch_size ];

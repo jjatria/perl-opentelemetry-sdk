@@ -2,6 +2,16 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Switch Metrics::Any client to strict mode, to allow for automatic
+      metric name generation. This means the metrics can be exported
+      with adapters that don't allow periods (eg. Prometheus). This
+      means some metrics had to be renamed:
+      - otel.bsp.export.success -> otel.bsp.success
+      - otel.bsp.export.failure -> otel.bsp.failure
+      - otel.bsp.dropped_spans -> otel.bsp.spans.dropped
+      - otel.bsp.exported_spans -> otel.bsp.spans.processed
+      - otel.bsp.buffer_utilization -> otel.bsp.buffer.utilization
+
 0.019     2023-11-23 19:31:08+00:00 Europe/London
 
     * Validate span processors when adding them to the TracerProvider
