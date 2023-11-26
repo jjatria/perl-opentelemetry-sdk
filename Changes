@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.020     2023-11-26 16:18:52+00:00 Europe/London
 
     * Switch Metrics::Any client to strict mode, to allow for automatic
       metric name generation. This means the metrics can be exported
