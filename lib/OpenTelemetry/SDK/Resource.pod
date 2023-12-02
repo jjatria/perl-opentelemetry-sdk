@@ -14,7 +14,7 @@ OpenTelemetry::SDK::Resource - Represents the entity producing OpenTelemetry dat
     );
 
     # Merge resources into new ones
-    my $new $resource->merge($other);
+    my $new = $resource->merge($other);
 
 =head1 DESCRIPTION
 
