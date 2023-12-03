@@ -1,5 +1,7 @@
 Revision history for OpenTelemetry-SDK
 
+{{$NEXT}}
+
 0.021     2023-12-03 14:46:29+00:00 Europe/London
 
     * Clarify meaning of OTEL_BSP_EXPORT_TIMEOUT in POD
