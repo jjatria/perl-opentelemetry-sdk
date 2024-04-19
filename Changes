@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.022     2024-04-19 11:46:54+01:00 Europe/London
 
     * Do not call start on the background function in the batch span
       processor, this is handled automatically by the loop (GH #13)
