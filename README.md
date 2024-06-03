@@ -96,7 +96,7 @@ $tracer->in_span( foo => sub ( $span, $ ) {
     # Set an attribute
     $span->set_attribute(  platform => 'osx' );
     # Add an event
-    $span->add_event('event in bar');
+    $span->add_event('event in foo');
     # Create bar as child of foo
     $tracer->in_span( bar => sub { $child_span, $ ) {
         # Inspect the span
