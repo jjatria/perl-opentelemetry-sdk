@@ -21,12 +21,17 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
         ) unless $exporter && $exporter->DOES('OpenTelemetry::Exporter');
     }
 
+    method process ( @items ) {
+        $exporter->export(\@items);
+        return;
+    }
+
     method on_start ( $span, $context ) { }
 
     method on_end ($span) {
         try {
             return unless $span->context->trace_flags->sampled;
-            $exporter->export( [$span->snapshot] );
+            $self->process( $span->snapshot );
         }
         catch ($e) {
             OpenTelemetry->handle_error(
@@ -34,8 +39,6 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Simple
                 message   => 'unexpected error in ' . ref($self) . '->on_end',
             );
         }
-
-        return;
     }
 
     async method shutdown ( $timeout = undef ) {

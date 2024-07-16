@@ -1,5 +1,12 @@
 Revision history for OpenTelemetry-SDK
 
+{{$NEXT}}
+
+    * Add a `process` method to the Simple and Batch span processors
+      to prepare for an upcoming change to the API to support
+      OpenTelemetry logs. Their `on_end` methods now are thin wrappers
+      to these new methods.
+
 0.022     2024-04-19 11:46:54+01:00 Europe/London
 
     * Do not call start on the background function in the batch span
