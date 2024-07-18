@@ -3,7 +3,7 @@ use Object::Pad;
 
 package OpenTelemetry::SDK::Trace::Tracer;
 
-our $VERSION = '0.023001';
+our $VERSION = '0.023002';
 
 class OpenTelemetry::SDK::Trace::Tracer :isa(OpenTelemetry::Trace::Tracer) {
     use OpenTelemetry::Constants 'SPAN_KIND_INTERNAL';

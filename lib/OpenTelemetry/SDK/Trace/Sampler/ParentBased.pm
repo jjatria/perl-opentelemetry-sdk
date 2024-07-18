@@ -3,7 +3,7 @@ use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::SDK::Trace::Sampler::ParentBased;
 
-our $VERSION = '0.023001';
+our $VERSION = '0.023002';
 
 class OpenTelemetry::SDK::Trace::Sampler::ParentBased
     :does(OpenTelemetry::SDK::Trace::Sampler)
