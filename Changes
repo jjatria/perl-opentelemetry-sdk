@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.023001  2024-07-18 10:38:35+01:00 Europe/London (TRIAL RELEASE)
 
     * Add a `process` method to the Simple and Batch span processors
       to prepare for an upcoming change to the API to support
