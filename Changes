@@ -1,5 +1,12 @@
 Revision history for OpenTelemetry-SDK
 
+{{$NEXT}}
+
+    * Use bigfloat instead of bignum in TraceIDRatioBased sampler
+      to avoid complications in other code relaying on Math::BigInt
+      and friends. This adds a dependency on Math::BigInt 0.65.
+      See GH #16.
+
 0.023001  2024-07-18 10:38:35+01:00 Europe/London (TRIAL RELEASE)
 
     * Add a `process` method to the Simple and Batch span processors
