@@ -3,7 +3,7 @@ use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::SDK::Trace::Sampler::Result;
 
-our $VERSION = '0.023002';
+our $VERSION = '0.024';
 
 use constant {
     DROP              => 0,
