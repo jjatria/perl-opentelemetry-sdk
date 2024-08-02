@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.024     2024-08-02 15:28:11+01:00 Europe/London
 
     * Use bigfloat instead of bignum in TraceIDRatioBased sampler
       to avoid complications in other code relaying on Math::BigInt
