@@ -13,11 +13,19 @@ use Feature::Compat::Try;
 use OpenTelemetry::Common 'config';
 use OpenTelemetry::Propagator::Composite;
 use OpenTelemetry::SDK::Trace::TracerProvider;
+use OpenTelemetry::SDK::Logs::LoggerProvider;
 use OpenTelemetry;
 
-my sub configure_propagators {
-    my $logger = OpenTelemetry->logger;
+use Log::Any;
+my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
+# TODO: These used to be private methods, but exposing them as part of
+# the OpenTelemetry::SDK interface made testing this a lot simpler.
+# It might be that exposing them to the user is actually desirable though,
+# since it might come in handy for keeping the default configuration
+# for _most_ things, but customising it for others. If so, we should
+# decide what the interface here will look like.
+sub configure_propagators {
     state %map = (
         b3           => 'B3',
         b3multi      => 'B3::Multi',
@@ -57,12 +65,61 @@ my sub configure_propagators {
         = OpenTelemetry::Propagator::Composite->new(@propagators),
 }
 
-my sub configure_span_processors {
-    my $logger = OpenTelemetry->logger;
-
+sub configure_logger_provider {
     state %map = (
         jaeger  => '::Jaeger',
-        otlp    => '::OTLP',
+        otlp    => '::OTLP::Logs',
+        zipkin  => '::Zipkin',
+        console => 'OpenTelemetry::SDK::Exporter::Console',
+    );
+
+    my @names = split ',',
+        ( config('LOGS_EXPORTER') // 'otlp' ) =~ s/\s//gr;
+
+    my $provider = OpenTelemetry::SDK::Logs::LoggerProvider->new;
+
+    my %seen;
+    for my $name ( @names ) {
+        next if $name eq 'none';
+
+        unless ( $map{$name} ) {
+            $logger->warnf("Unknown exporter '%s' cannot be configured", $name);
+            next;
+        }
+
+        next if $seen{ $map{$name} }++;
+
+        my $exporter = $map{$name} =~ /^::/
+            ? ( 'OpenTelemetry::Exporter' . $map{$name} )
+            : $map{$name};
+
+        my $processor = 'OpenTelemetry::SDK::Logs::LogRecord::Processor::'
+            . ( $name eq 'console' ? 'Simple' : 'Batch' );
+
+        try {
+            Module::Runtime::require_module $exporter;
+            Module::Runtime::require_module $processor;
+
+            $provider->add_log_record_processor(
+                $processor->new( exporter => $exporter->new )
+            );
+        }
+        catch ($e) {
+            warn "Caught an error: $e";
+            $logger->warn(
+                'Error configuring log record processor',
+                { type => $name, error => "$e" },
+            )
+        }
+    }
+
+    OpenTelemetry->logger_provider = $provider;
+}
+
+sub configure_tracer_provider {
+    state %map = (
+        jaeger  => '::Jaeger',
+        otlp    => '::OTLP::Traces',
         zipkin  => '::Zipkin',
         console => 'OpenTelemetry::SDK::Exporter::Console',
     );
@@ -110,11 +167,10 @@ sub import ( $class ) {
     return if config('SDK_DISABLED');
 
     try {
-        # TODO: logger
         # TODO: error_handler
-
         configure_propagators();
-        configure_span_processors();
+        configure_logger_provider();
+        configure_tracer_provider();
     }
     catch ($e) {
         OpenTelemetry->handle_error(
