@@ -10,16 +10,16 @@ use OpenTelemetry::SDK::Trace::Sampler::Result;
 class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
     :does(OpenTelemetry::SDK::Trace::Sampler)
 {
-    use OpenTelemetry;
+    use Log::Any;
     use Scalar::Util 'looks_like_number';
+
+    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
     field $threshold;
     field $ratio       :param = 1;
     field $description :reader;
 
     ADJUST {
-        my $logger = OpenTelemetry->logger;
-
         unless ( looks_like_number $ratio ) {
             $logger->warn(
                 'Ratio for TraceIDRatioBased sampler was not a number',

@@ -7,9 +7,11 @@ our $VERSION = '0.025';
 class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
     use experimental 'isa';
 
-    use OpenTelemetry;
-    use OpenTelemetry::Common 'config';
     use File::Basename 'basename';
+    use Log::Any;
+    use OpenTelemetry::Common 'config';
+
+    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
     require OpenTelemetry::SDK; # For VERSION
 
@@ -29,7 +31,7 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
                 #                  !      #  ..  +      -  ..  :      <  ..  [      ]  ..  ~
                 $env{$_} =~ /([^ \x{21} \x{23}-\x{2B} \x{2D}-\x{3A} \x{3C}-\x{5B} \x{5D}-\x{7E} ])/xx
             ) {
-                OpenTelemetry->logger->warn(
+                $logger->warn(
                     'Ignoring invalid resource attribute value in environment: must be percent-encoded',
                     { key => $_ },
                 );
@@ -71,7 +73,7 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
         my $theirs = $new->schema_url;
 
         if ( $ours && $theirs && $ours ne $theirs ) {
-            OpenTelemetry->logger->warn(
+            $logger->warn(
                 'Incompatible resource schema URLs when merging resources. Ignoring new one',
                 { old => $ours, new => $theirs },
             );

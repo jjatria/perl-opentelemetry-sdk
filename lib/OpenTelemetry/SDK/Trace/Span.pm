@@ -4,9 +4,6 @@ package OpenTelemetry::SDK::Trace::Span;
 
 our $VERSION = '0.025';
 
-use OpenTelemetry;
-my $logger = OpenTelemetry->logger;
-
 use OpenTelemetry::Attributes;
 
 class OpenTelemetry::SDK::Trace::Span
@@ -16,6 +13,7 @@ class OpenTelemetry::SDK::Trace::Span
     use experimental 'isa';
 
     use List::Util qw( any pairs );
+    use Log::Any;
     use Ref::Util qw( is_arrayref is_hashref );
     use Time::HiRes 'time';
 
@@ -29,6 +27,8 @@ class OpenTelemetry::SDK::Trace::Span
     use OpenTelemetry::Trace::SpanContext;
     use OpenTelemetry::Trace::Span::Status;
     use OpenTelemetry::Trace;
+
+    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
     field $dropped_events      = 0;
     field $dropped_links       = 0;
