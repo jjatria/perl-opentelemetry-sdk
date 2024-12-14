@@ -2,6 +2,14 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Marked OpenTelemetry::Exporter::OTLP as a dependency instead
+      of a recommended distribution. Since OTLP is the default
+      exporter for the SDK, it doesn't make sense to ship without it.
+      The reason it was released as a separate distribution was
+      initially because it depended on Google::ProtocolBuffers::Dynamic,
+      but now it doesn't: it will use that distribution if it is
+      available but use JSON otherwise.
+
 0.024     2024-08-02 15:28:11+01:00 Europe/London
 
     * Use bigfloat instead of bignum in TraceIDRatioBased sampler

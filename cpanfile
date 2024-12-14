@@ -5,9 +5,8 @@ requires 'Metrics::Any';
 requires 'Mutex';
 requires 'Object::Pad', '0.74'; # For //= field initialisers
 requires 'OpenTelemetry', '0.010';
+requires 'OpenTelemetry::Exporter::OTLP';
 requires 'bigfloat', '0.65'; # Pragma added in Math::BigInt 0.65
-
-recommends 'OpenTelemetry::Exporter::OTLP';
 
 on test => sub {
     requires 'File::Temp';
