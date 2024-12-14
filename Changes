@@ -9,6 +9,10 @@ Revision history for OpenTelemetry-SDK
       initially because it depended on Google::ProtocolBuffers::Dynamic,
       but now it doesn't: it will use that distribution if it is
       available but use JSON otherwise.
+    * BREAKING CHANGE: the SDK will now die if it encounters an error
+      during initialisation. This will only affect the code executed
+      during import. Once the SDK has been loaded, it will never
+      intentionally raise an exception.
 
 0.024     2024-08-02 15:28:11+01:00 Europe/London
 
