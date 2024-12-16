@@ -5,18 +5,19 @@ our $VERSION = '0.025';
 
 use strict;
 use warnings;
-use experimental qw( signatures lexical_subs );
+use experimental qw( isa signatures lexical_subs );
 use feature 'state';
 
-use Module::Runtime;
 use Feature::Compat::Try;
+use Log::Any;
+use Module::Runtime;
 use OpenTelemetry::Common 'config';
 use OpenTelemetry::Propagator::Composite;
 use OpenTelemetry::SDK::Trace::TracerProvider;
-use OpenTelemetry;
+use OpenTelemetry::X;
 
 my sub configure_propagators {
-    my $logger = OpenTelemetry->logger;
+    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
     state %map = (
         b3           => 'B3',
@@ -49,7 +50,9 @@ my sub configure_propagators {
             push @propagators, $class->new;
         }
         catch ($e) {
-            $logger->warnf("Error configuring '%s' propagator: %s", $name, $e);
+            die OpenTelemetry::X->create(
+                Invalid => "Error configuring '$name' propagator: $e",
+            );
         }
     }
 
@@ -58,7 +61,7 @@ my sub configure_propagators {
 }
 
 my sub configure_span_processors {
-    my $logger = OpenTelemetry->logger;
+    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
     state %map = (
         jaeger  => '::Jaeger',
@@ -99,7 +102,9 @@ my sub configure_span_processors {
             );
         }
         catch ($e) {
-            $logger->warnf("Error configuring '%s' span processor: %s", $name, $e);
+            die OpenTelemetry::X->create(
+                Invalid => "Error configuring '$name' span processor: $e",
+            );
         }
     }
 
@@ -117,9 +122,9 @@ sub import ( $class ) {
         configure_span_processors();
     }
     catch ($e) {
-        OpenTelemetry->handle_error(
-            exception => $e,
-            message   => 'Unexpected configuration error'
+        die $e if $e isa OpenTelemetry::X;
+        die OpenTelemetry::X->create(
+            Invalid => "Unexpected error initialising OpenTelemetry::SDK: $e",
         );
     }
 }
