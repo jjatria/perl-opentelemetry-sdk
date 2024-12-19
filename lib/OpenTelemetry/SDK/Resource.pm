@@ -5,11 +5,11 @@ package OpenTelemetry::SDK::Resource;
 our $VERSION = '0.025';
 
 class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
-    use experimental 'isa';
-
     use File::Basename 'basename';
     use Log::Any;
     use OpenTelemetry::Common 'config';
+
+    use isa 'OpenTelemetry::SDK::Resource';
 
     my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
@@ -67,7 +67,7 @@ class OpenTelemetry::SDK::Resource :does(OpenTelemetry::Attributes) {
     }
 
     method merge ( $new ) {
-        return $self unless $new isa OpenTelemetry::SDK::Resource;
+        return $self unless isa_OpenTelemetry_SDK_Resource $new;
 
         my $ours   = $self->schema_url;
         my $theirs = $new->schema_url;

@@ -10,8 +10,6 @@ class OpenTelemetry::SDK::Trace::Span
     :isa(OpenTelemetry::Trace::Span)
     :does(OpenTelemetry::Attributes)
 {
-    use experimental 'isa';
-
     use List::Util qw( any pairs );
     use Log::Any;
     use Ref::Util qw( is_arrayref is_hashref );
@@ -27,6 +25,12 @@ class OpenTelemetry::SDK::Trace::Span
     use OpenTelemetry::Trace::SpanContext;
     use OpenTelemetry::Trace::Span::Status;
     use OpenTelemetry::Trace;
+
+    use isa qw(
+        Exception::Base
+        Exception::Class::Base
+        OpenTelemetry::Trace::SpanContext
+    );
 
     my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
 
@@ -55,7 +59,7 @@ class OpenTelemetry::SDK::Trace::Span
     # Links with invalid span contexts are ignored
     #
     method $add_link ( $args ) {
-        return unless $args->{context} isa OpenTelemetry::Trace::SpanContext
+        return unless isa_OpenTelemetry_Trace_SpanContext($args->{context})
             && $args->{context}->valid;
 
         if ( scalar @links >= $limits->link_count_limit ) {
@@ -162,7 +166,7 @@ class OpenTelemetry::SDK::Trace::Span
         return $self unless $self->recording;
 
         my ( $message, $stacktrace );
-        if ( $exception isa Exception::Class::Base ) {
+        if ( isa_Exception_Class_Base $exception ) {
             $message    = $exception->message;
             $stacktrace = $exception->trace->as_string;
         }
@@ -183,7 +187,7 @@ class OpenTelemetry::SDK::Trace::Span
             ( $message, $stacktrace ) = split /\n/, "$exception", 2;
 
             $stacktrace //= $exception->get_caller_stacktrace
-                if $exception isa Exception::Base;
+                if isa_Exception_Base $exception;
         }
 
         $self->add_event(

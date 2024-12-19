@@ -26,8 +26,6 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use OpenTelemetry::SDK::Trace::Tracer;
     use OpenTelemetry::Trace::SpanContext;
 
-    use experimental 'isa';
-
     field $sampler      :param = undef;
     field $id_generator :param = 'OpenTelemetry::Trace';
     field $span_limits  :param //= OpenTelemetry::SDK::Trace::SpanLimits->new;
@@ -235,11 +233,11 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
                 ->warn('Attempted to add an object that does not do the OpenTelemetry::Trace::Span::Processor role as a span processor to a TraceProvider')
                 unless $processor->DOES('OpenTelemetry::Trace::Span::Processor');
 
+            my %seen = map { ref, 1 } @processors;
             my $candidate = ref $processor;
 
             return OpenTelemetry->logger
-                ->warn("Attempted to add a $candidate span processor to a TraceProvider more than once")
-                if any { $_ isa $candidate } @processors;
+                ->warn("Attempted to add a $candidate span processor to a TraceProvider more than once") if $seen{$candidate};
 
             push @processors, $processor;
         });

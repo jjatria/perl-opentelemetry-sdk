@@ -27,7 +27,7 @@
       "configure" : {
          "requires" : {
             "Module::Build::Tiny" : "0.034",
-            "perl" : "v5.32.0"
+            "perl" : "v5.30.0"
          }
       },
       "develop" : {
@@ -52,7 +52,8 @@
             "Object::Pad" : "0.74",
             "OpenTelemetry" : "0.010",
             "bigfloat" : "0.65",
-            "perl" : "v5.32.0"
+            "isa" : "0",
+            "perl" : "v5.30.0"
          }
       },
       "test" : {
@@ -67,7 +68,7 @@
             "Syntax::Keyword::Dynamically" : "0",
             "Test2::V0" : "0",
             "Test::More" : "0",
-            "perl" : "v5.32.0"
+            "perl" : "v5.30.0"
          }
       }
    },

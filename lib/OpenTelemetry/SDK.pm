@@ -5,7 +5,7 @@ our $VERSION = '0.025';
 
 use strict;
 use warnings;
-use experimental qw( isa signatures lexical_subs );
+use experimental qw( signatures lexical_subs );
 use feature 'state';
 
 use Feature::Compat::Try;
@@ -15,6 +15,8 @@ use OpenTelemetry::Common 'config';
 use OpenTelemetry::Propagator::Composite;
 use OpenTelemetry::SDK::Trace::TracerProvider;
 use OpenTelemetry::X;
+
+use isa 'OpenTelemetry::X';
 
 my sub configure_propagators {
     my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
@@ -122,7 +124,7 @@ sub import ( $class ) {
         configure_span_processors();
     }
     catch ($e) {
-        die $e if $e isa OpenTelemetry::X;
+        die $e if isa_OpenTelemetry_X $e;
         die OpenTelemetry::X->create(
             Invalid => "Unexpected error initialising OpenTelemetry::SDK: $e",
         );
