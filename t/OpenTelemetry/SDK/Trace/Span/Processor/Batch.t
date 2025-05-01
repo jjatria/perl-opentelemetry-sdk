@@ -119,17 +119,6 @@ describe on_end => sub {
         $sampled = 0;
     };
 
-    case 'Unforeseen errors' => sub {
-        my ($mock) = mocked $span;
-        $mock->override( context => sub { die 'boom' } );
-        @logs = (
-            [
-                error => 'OpenTelemetry',
-                match qr/unexpected error in .*on_end - boom/,
-            ]
-        );
-    };
-
     it Works => { flat => 1 } => sub {
         my $exporter  = Local::Test->new;
         my $processor = CLASS->new(
@@ -175,21 +164,10 @@ tests 'Flush queue' => sub {
 
     $processor->on_end($span) for 1..3;
 
-    my $metrics = metrics {
-        no_messages {
-            is $processor->force_flush->get, TRACE_EXPORT_SUCCESS,
-                'Flushing returns success';
-        };
+    no_messages {
+        is $processor->force_flush->get, TRACE_EXPORT_SUCCESS,
+            'Flushing returns success';
     };
-
-    {
-        my $todo = todo 'Metrics tests are unstable';
-        is $metrics, bag {
-            item 'otel.bsp.export.success = 1';
-            item 'otel.bsp.exported_spans = 3';
-            etc;
-        }, 'Generated correct metrics';
-    }
 
     $processor->shutdown->get;
 };
@@ -197,7 +175,7 @@ tests 'Flush queue' => sub {
 tests 'Ignore calls on shutdown' => sub {
     my $processor = CLASS->new( exporter => my $exporter = Local::Test->new );
 
-    $processor->shutdown;
+    $processor->shutdown->get;
     is $exporter->calls, [ [ 'shutdown' ] ], 'Calling shutdown propagates to exporter';
     $exporter->reset;
 

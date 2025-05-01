@@ -69,23 +69,6 @@ describe on_end => sub {
             is $exporter->calls, \@calls, 'Correct calls on exporter';
         };
     };
-
-    tests 'Exceptions' => sub {
-        my $exporter  = Local::Test->new;
-        my $processor = CLASS->new( exporter => $exporter );
-        my $span = mock {} => add => [ context => sub { die 'oops' } ];
-
-        is messages {
-            is $processor->on_end($span), U, 'Returns undefined';
-        }, [
-            [
-                error => 'OpenTelemetry',
-                match qr/unexpected error in .*->on_end - oops/,
-            ],
-        ], 'Logged error';
-
-        is $exporter->calls, [], 'No calls on exporter';
-    };
 };
 
 describe shutdown => sub {

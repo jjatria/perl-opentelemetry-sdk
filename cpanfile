@@ -1,4 +1,5 @@
 requires 'isa'; # To support perls older than 5.32
+requires 'Const::Fast';
 requires 'Feature::Compat::Try';
 requires 'Future::AsyncAwait', '0.38'; # Object::Pad compatibility
 requires 'IO::Async::Loop';
