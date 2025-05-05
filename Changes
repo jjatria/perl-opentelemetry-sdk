@@ -1,6 +1,6 @@
 Revision history for OpenTelemetry-SDK
 
-{{$NEXT}}
+0.026     2025-05-05 21:50:19+01:00 Europe/London
 
     * Move away from OpenTelemetry::logger, which is being deprecated.
 
