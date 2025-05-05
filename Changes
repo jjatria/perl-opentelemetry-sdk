@@ -5,6 +5,7 @@ Revision history for OpenTelemetry-SDK
 0.026     2025-05-05 21:50:19+01:00 Europe/London
 
     * Move away from OpenTelemetry::logger, which is being deprecated.
+    * Add initial support for programmatic configuration
 
 0.025     2024-12-21 10:23:35+00:00 Europe/London
 
