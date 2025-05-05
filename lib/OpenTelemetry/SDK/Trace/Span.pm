@@ -2,7 +2,7 @@ use Object::Pad ':experimental( init_expr mop )';
 
 package OpenTelemetry::SDK::Trace::Span;
 
-our $VERSION = '0.026';
+our $VERSION = '0.027';
 
 use OpenTelemetry::Attributes;
 
