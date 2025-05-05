@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Move away from OpenTelemetry::logger, which is being deprecated.
+
 0.025     2024-12-21 10:23:35+00:00 Europe/London
 
     * Marked OpenTelemetry::Exporter::OTLP as a dependency instead
