@@ -37,8 +37,7 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     field $lock          //= Mutex->new;
     field $registry_lock //= Mutex->new;
 
-    use Log::Any;
-    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
+    my $logger = OpenTelemetry::Common::internal_logger;
 
     ADJUST {
         try {

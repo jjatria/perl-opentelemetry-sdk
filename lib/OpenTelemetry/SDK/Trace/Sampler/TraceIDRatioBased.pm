@@ -10,10 +10,10 @@ use OpenTelemetry::SDK::Trace::Sampler::Result;
 class OpenTelemetry::SDK::Trace::Sampler::TraceIDRatioBased
     :does(OpenTelemetry::SDK::Trace::Sampler)
 {
-    use Log::Any;
+    use OpenTelemetry::Common ();
     use Scalar::Util 'looks_like_number';
 
-    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
+    my $logger = OpenTelemetry::Common::internal_logger;
 
     field $threshold;
     field $ratio       :param = 1;

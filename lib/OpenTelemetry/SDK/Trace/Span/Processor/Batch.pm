@@ -8,7 +8,6 @@ our $VERSION = '0.027';
 class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     :does(OpenTelemetry::Trace::Span::Processor)
 {
-    use Log::Any;
     use Feature::Compat::Defer;
     use Feature::Compat::Try;
     use Future::AsyncAwait;
@@ -20,7 +19,7 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     use OpenTelemetry::X;
     use OpenTelemetry;
 
-    my $logger = Log::Any->get_logger( category => 'OpenTelemetry' );
+    my $logger = OpenTelemetry::Common::internal_logger;
 
     use Metrics::Any '$metrics', strict => 1,
         name_prefix => [qw( otel bsp )];
