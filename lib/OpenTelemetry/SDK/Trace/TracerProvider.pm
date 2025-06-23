@@ -217,17 +217,17 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
 
     method add_span_processor ($processor) {
         $lock->enter( sub {
-            return $logger->warn('Attempted to add a span processor to a TraceProvider after shutdown')
+            return $logger->warn('Attempted to add a span processor to a TracerProvider after shutdown')
                 if $stopped;
 
             my $candidate = ref $processor;
 
-            return $logger->warn("Attempted to add a $candidate object as a span processor to a TraceProvider, but it does not do the OpenTelemetry::Trace::Span::Processor")
+            return $logger->warn("Attempted to add a $candidate object as a span processor to a TracerProvider, but it does not do the OpenTelemetry::Trace::Span::Processor")
                 unless $processor->DOES('OpenTelemetry::Trace::Span::Processor');
 
             my %seen = map { ref, 1 } @processors;
 
-            return $logger->warn("Attempted to add a $candidate span processor to a TraceProvider more than once")
+            return $logger->warn("Attempted to add a $candidate span processor to a TracerProvider more than once")
                 if $seen{$candidate};
 
             push @processors, $processor;
