@@ -2,7 +2,7 @@
 *.swp
 *.swo
 .build/
-cover_db/
+cover*
 
 # Build artifacts
 Build
