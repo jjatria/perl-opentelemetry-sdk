@@ -3,6 +3,7 @@ Revision history for OpenTelemetry-SDK
 {{$NEXT}}
 
     * Add initial support for programmatic configuration
+    * Add support for custom formats in console exporter
 
 0.027     2025-05-08 08:50:57 BST
 
