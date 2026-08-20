@@ -13,8 +13,8 @@ OpenTelemetry::SDK - An implementation of the OpenTelemetry SDK for Perl
     require OpenTelemetry::SDK;
     OpenTelemetry::SDK->import;
 
-    # Load any integrations you may want
-    use OpenTelemetry::Integration qw( HTTP::Tiny );
+    # Load any instrumentation libraries you may want
+    use OpenTelemetry::Instrumentation qw( HTTP::Tiny );
 
     # You can also configure some parts of the SDK manually
     # like passing in your own tracer provider...
