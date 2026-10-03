@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+0.029     2026-10-03 22:40:32 BST (TRIAL RELEASE)
+
     * EXPERIMENTAL: Add support for logs
     * BREAKING CHANGE: The batch exporter metrics have changed name.
       The metrics stored under 'otel.bsp' are now stored under

@@ -168,7 +168,7 @@
          "version" : "0.029"
       }
    },
-   "release_status" : "stable",
+   "release_status" : "testing",
    "resources" : {
       "bugtracker" : {
          "web" : "https://github.com/jjatria/perl-opentelemetry-sdk/issues"
