@@ -3,7 +3,7 @@ use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::Processor::Batch;
 
-our $VERSION = '0.028';
+our $VERSION = '0.030';
 
 # TODO: If we move the different base implementations of processors
 # to the top-level, that still leaves the specific implementations

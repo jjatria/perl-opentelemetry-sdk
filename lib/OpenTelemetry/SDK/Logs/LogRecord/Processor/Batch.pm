@@ -3,7 +3,7 @@ use Object::Pad ':experimental(init_expr)';
 
 package OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch;
 
-our $VERSION = '0.028';
+our $VERSION = '0.030';
 
 class OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch
     :isa(OpenTelemetry::Processor::Batch)
