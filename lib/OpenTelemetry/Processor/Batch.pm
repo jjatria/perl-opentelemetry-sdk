@@ -132,28 +132,9 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     method report_result ( $result, $count ) { $result }
 
-    async method shutdown ( $timeout = undef ) {
-        return EXPORT_RESULT_SUCCESS if $done;
-
-        $done = 1;
-
-        my $start = timeout_timestamp;
-
-        # TODO: The Ruby implementation ignores whether the force_flush
-        # times out. Is this correct?
-        await $self->force_flush( maybe_timeout $timeout, $start );
-
-        $self->report_dropped( 'terminating', scalar @queue ) if @queue;
-        @queue = ();
-
-        await $function->stop if $function->workers;
-
-        await $exporter->shutdown( maybe_timeout $timeout, $start );
-    }
-
-    async method force_flush ( $timeout = undef ) {
-        return EXPORT_RESULT_SUCCESS if $done;
-
+    # Export every item currently in the queue. This is the part of
+    # force_flush that shutdown also needs to do before it stops.
+    async method $export_queue ( $timeout = undef ) {
         my $start = timeout_timestamp;
 
         my @stack = $lock->enter( sub { splice @queue, 0, @queue } );
@@ -185,6 +166,38 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                 return $self->report_result( EXPORT_RESULT_FAILURE, $count);
             }
         }
+
+        return EXPORT_RESULT_SUCCESS;
+    }
+
+    async method shutdown ( $timeout = undef ) {
+        return EXPORT_RESULT_SUCCESS if $done;
+
+        $done = 1;
+
+        my $start = timeout_timestamp;
+
+        # TODO: The Ruby implementation ignores whether the force_flush
+        # times out. Is this correct?
+        # This exports the queue directly instead of calling force_flush,
+        # since force_flush is a no-op once $done has been set
+        await $self->$export_queue( maybe_timeout $timeout, $start );
+
+        $self->report_dropped( 'terminating', scalar @queue ) if @queue;
+        @queue = ();
+
+        await $function->stop if $function->workers;
+
+        await $exporter->shutdown( maybe_timeout $timeout, $start );
+    }
+
+    async method force_flush ( $timeout = undef ) {
+        return EXPORT_RESULT_SUCCESS if $done;
+
+        my $start = timeout_timestamp;
+
+        my $result = await $self->$export_queue( maybe_timeout $timeout, $start );
+        return $result unless $result == EXPORT_RESULT_SUCCESS;
 
         await $exporter->force_flush( maybe_timeout $timeout, $start );
     }
