@@ -398,6 +398,35 @@ See L<OpenTelemetry::SDK::Trace::SpanLimits> for more details.
 
 This variable is non-standard.
 
+=item OTEL_LOGS_EXPORTER
+
+Log exporter to be used. Default: C<otlp>.
+
+This can be set to a comma-separated list of values, to set multiple
+exporters. They will be deduplicated before configuration takes place.
+
+Possible values (and the classes that represent them) are listed below:
+
+=over
+
+=item C<otlp>
+
+L<OpenTelemetry::Exporter::OTLP>
+
+=item C<zipkin>
+
+L<OpenTelemetry::Exporter::Zipkin> (NYI)
+
+=item C<console>
+
+L<OpenTelemetry::SDK::Exporter::Console>
+
+This value is non-standard.
+
+=item none
+
+=back
+
 =item OTEL_RESOURCE_ATTRIBUTES
 
 Key-value pairs to be used as resource attributes. Default: empty, for no

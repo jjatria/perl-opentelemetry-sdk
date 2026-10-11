@@ -2,6 +2,10 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Add documentation for the new OTEL_LOGS_EXPORTER environment
+      variable (quietly supported since 0.029), and the missing POD
+      for OpenTelemetry::SDK::Logs::LogRecord.
+
 0.029     2026-10-03 22:40:32 BST (TRIAL RELEASE)
 
     * EXPERIMENTAL: Add support for logs
