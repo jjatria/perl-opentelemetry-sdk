@@ -57,6 +57,26 @@ tests 'Flush queue' => sub {
     $processor->shutdown->get;
 };
 
+tests 'Export queued items on shutdown' => sub {
+    my $processor = CLASS->new(
+        batch_size => 4,
+        queue_size => 4,
+        exporter   => my $exporter = Local::Exporter::File->new,
+    );
+
+    # Fewer items than the batch size, so nothing is exported yet
+    $processor->process({}) for 1..3;
+    is $exporter->calls, [], 'Nothing exported before shutdown';
+
+    is $processor->shutdown->get, TRACE_EXPORT_SUCCESS,
+        'shutdown returns success';
+
+    is $exporter->calls, [
+        [ export => [ {}, {}, {} ], E ],
+        [ 'shutdown', U ],
+    ], 'Queued items are exported before the exporter is shut down';
+};
+
 tests 'Ignore calls on shutdown' => sub {
     my $processor = CLASS->new(
         exporter => my $exporter = Local::Exporter::File->new,
