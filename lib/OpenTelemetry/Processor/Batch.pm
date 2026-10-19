@@ -135,7 +135,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     async method shutdown ( $timeout = undef ) {
         return EXPORT_RESULT_SUCCESS if $done;
 
-        $done = 1;
+        defer { $done = 1 }
 
         my $start = timeout_timestamp;
 
