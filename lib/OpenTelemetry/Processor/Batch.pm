@@ -19,11 +19,13 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     use Future::AsyncAwait;
     use IO::Async::Function;
     use IO::Async::Loop;
+    use IO::Async::Timer::Countdown;
     use Mutex;
     use OpenTelemetry::Common qw( config timeout_timestamp maybe_timeout );
     use OpenTelemetry::Constants -export;
     use OpenTelemetry::X;
     use OpenTelemetry;
+    use Scalar::Util qw( refaddr weaken );
 
     my $logger = OpenTelemetry::Common::internal_logger;
 
@@ -45,7 +47,102 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     field $done :reader;
     field $function;
+    field $timer;
+    field $scheduled_export;
+    field $flushing = 0;
+    field %running;
     field @queue;
+
+    # Start the countdown to the next scheduled export. It only runs while
+    # there are records in the queue and no export is running, so the
+    # delay counts from the end of the previous export.
+    method $schedule () {
+        return unless $timer && $timer->loop;
+        return if $timer->is_running || $flushing || %running || !@queue;
+        $timer->start;
+    }
+
+    # Keep track of an export until it ends. When the last running export
+    # ends, schedule the next one.
+    method $track ( $future ) {
+        my $key = refaddr $future;
+        $running{$key} = $future;
+
+        weaken( my $weak = $self );
+        $future->on_ready( sub {
+            return unless $weak;
+            delete $running{$key};
+            $weak->$schedule;
+        });
+    }
+
+    # Export one batch from the queue. A full batch does not wait for the
+    # timer, but it waits for a running scheduled export.
+    method $export_batch ( $batch ) {
+        # This export starts now, so stop the countdown. The end of this
+        # export schedules the next one.
+        $timer->stop if $timer && $timer->loop;
+
+        my $count = scalar @$batch;
+        try {
+            # Retain the future so we don't have to wait for it ourselves
+            $self->$track(
+                $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
+            )->on_ready( sub ( $f ) {
+                return $self->report_result( EXPORT_RESULT_FAILURE, $count )
+                    unless $f->is_done;
+
+                $self->report_result( $f->result, $count );
+            })->retain;
+        }
+        catch ($e) {
+            warn $e;
+            $self->$schedule;
+        }
+
+        return;
+    }
+
+    # Export the full batches that waited for a scheduled export. If a
+    # flush runs, leave them to the flush, so that it waits for them.
+    method $export_full_batches () {
+        return if $flushing;
+
+        while (
+            my $batch = $lock->enter( sub {
+                @queue >= $batch_size ? [ splice @queue, 0, $batch_size ] : undef;
+            })
+        ) {
+            $self->$export_batch($batch);
+        }
+
+        $self->$schedule;
+    }
+
+    async method $export_on_timer () {
+        # Another export started after the timer did. Its end will
+        # schedule the next export.
+        return if $flushing || %running;
+
+        my $batch = $lock->enter( sub { [ splice @queue, 0, $batch_size ] } );
+        return unless @$batch;
+
+        my $count = scalar @$batch;
+        try {
+            $scheduled_export = $self->$track(
+                $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
+            );
+
+            my $result = await $scheduled_export;
+            $self->report_result( $result, $count );
+        }
+        catch ($e) {
+            $self->report_result( EXPORT_RESULT_FAILURE, $count );
+        }
+
+        undef $scheduled_export;
+        $self->$export_full_batches;
+    }
 
     ADJUST {
         die OpenTelemetry::X->create(
@@ -63,6 +160,14 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             $batch_size = $max_queue_size;
         }
 
+        if ( $schedule_delay < 0 ) {
+            $logger->warn(
+                'Schedule delay cannot be negative when instantiating batch processor',
+                { schedule_delay => $schedule_delay },
+            );
+            $schedule_delay = 5_000;
+        }
+
         # This is a non-standard variable, so we make it Perl-specific
         my $max_workers = $ENV{OTEL_PERL_BSP_MAX_WORKERS};
 
@@ -74,7 +179,21 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             },
         );
 
-        IO::Async::Loop->new->add($function);
+        my $loop = IO::Async::Loop->new;
+        $loop->add($function);
+
+        # The timer only fires while the IO::Async loop runs. The callback
+        # holds a weak reference, so the timer does not keep the processor
+        # alive.
+        weaken( my $weak = $self );
+        $timer = IO::Async::Timer::Countdown->new(
+            delay     => $schedule_delay / 1000,
+            on_expire => sub {
+                $weak->$export_on_timer->retain if $weak;
+            },
+        );
+
+        $loop->add($timer);
     }
 
     method process ( @items ) {
@@ -95,7 +214,12 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
                     push @queue, @items;
 
-                    return [] if @queue < $batch_size;
+                    # A full batch waits while a scheduled export runs, so
+                    # the two do not run at the same time
+                    if ( @queue < $batch_size || $scheduled_export ) {
+                        $self->$schedule;
+                        return [];
+                    }
 
                     $metrics->set_gauge_to(
                         buffer_use => @queue / $max_queue_size
@@ -105,21 +229,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                 }
             );
 
-            return unless @$batch;
-
-            # Make sure we call this in void context so we don't have
-            # to wait for the future ourselves
-            $function->call(
-                args => [ $exporter, $batch, $exporter_timeout ],
-                on_result => sub ( $type, $result ) {
-                    my $count = scalar @$batch;
-
-                    return $self->report_result( EXPORT_RESULT_FAILURE, $count )
-                        unless $type eq 'return';
-
-                    $self->report_result( $result, $count );
-                },
-            );
+            $self->$export_batch($batch) if @$batch;
 
             return;
         }
@@ -139,6 +249,13 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
         my $start = timeout_timestamp;
 
+        # Stop the timer before the final export, so it cannot start
+        # another export while we flush the queue
+        if ( $timer and my $loop = $timer->loop ) {
+            $timer->stop;
+            $loop->remove($timer);
+        }
+
         # TODO: The Ruby implementation ignores whether the force_flush
         # times out. Is this correct?
         await $self->force_flush( maybe_timeout $timeout, $start );
@@ -151,10 +268,36 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         await $exporter->shutdown( maybe_timeout $timeout, $start );
     }
 
-    async method force_flush ( $timeout = undef ) {
+    async method $flush ( $timeout = undef ) {
         return EXPORT_RESULT_SUCCESS if $done;
 
         my $start = timeout_timestamp;
+
+        # Wait for exports that are still running, so that their records
+        # have been exported when we return
+        if ( my @pending = values %running ) {
+            my $all = Future->wait_all( map $_->without_cancel, @pending );
+
+            if ( defined( my $remaining = maybe_timeout $timeout, $start ) ) {
+                await Future->wait_any(
+                    $all,
+                    IO::Async::Loop->new->delay_future( after => $remaining ),
+                );
+
+                # wait_any cancels $all if the delay ends first
+                return EXPORT_RESULT_TIMEOUT unless $all->is_done;
+            }
+            else {
+                await $all;
+            }
+
+            for my $export ( @pending ) {
+                my $result = $export->is_done
+                    ? $export->result : EXPORT_RESULT_FAILURE;
+
+                return $result unless $result == EXPORT_RESULT_SUCCESS;
+            }
+        }
 
         my @stack = $lock->enter( sub { splice @queue, 0, @queue } );
 
@@ -173,8 +316,8 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
             my $count = scalar @$batch;
             try {
-                my $result = await $function->call(
-                    args => [ $exporter, $batch, $remaining ],
+                my $result = await $self->$track(
+                    $function->call( args => [ $exporter, $batch, $remaining ] )
                 );
 
                 $self->report_result( $result, $count );
@@ -189,7 +332,32 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         await $exporter->force_flush( maybe_timeout $timeout, $start );
     }
 
+    # This is not an async method, so that cancelling the future it returns
+    # does not have to unwind a defer block in an async method while it
+    # waits for running exports. With Future::AsyncAwait 0.71 on Perl 5.44,
+    # that crashes the interpreter.
+    method force_flush ( $timeout = undef ) {
+        # The flush exports the queue now, so stop the countdown. The end
+        # of the flush schedules the next export.
+        $timer->stop if $timer && $timer->loop;
+
+        $flushing++;
+
+        $self->$flush($timeout)->on_ready( sub {
+            $flushing--;
+            $self->$schedule;
+        });
+    }
+
     method DESTROY {
+        try {
+            if ( $timer and my $loop = $timer->loop ) {
+                $timer->stop;
+                $loop->remove($timer);
+            }
+        }
+        catch ($e) { }
+
         try { $function->stop if $function }
         catch ($e) { }
     }
