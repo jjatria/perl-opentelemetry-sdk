@@ -6,8 +6,26 @@ use Test2::Tools::OpenTelemetry;
 
 use OpenTelemetry::Constants -trace;
 
+use IO::Async::Loop;
+use experimental 'signatures';
+use File::Temp 'tempfile';
+use OpenTelemetry::Exporter;
+use Time::HiRes ();
+
 use lib 't/lib';
 use Local::Exporter::File;
+use Local::Exporter::Gated;
+
+sub run_loop ( $seconds ) {
+    IO::Async::Loop->new->delay_future( after => $seconds )->get;
+}
+
+# Run the loop until the condition is true, with a generous watchdog
+sub run_loop_until ( $condition, $name ) {
+    my $deadline = Time::HiRes::time + 10;
+    run_loop 0.01 until $condition->() || Time::HiRes::time > $deadline;
+    ok $condition->(), $name;
+}
 
 tests Validation => sub {
     like dies { CLASS->new },
@@ -74,6 +92,328 @@ tests 'Shutdown flushes and ignores further calls' => sub {
     is $processor->shutdown->get,    TRACE_EXPORT_SUCCESS, 'shutdown returns success';
 
     is $exporter->calls, [ ], 'No calls got to exporter after shutdown';
+};
+
+tests 'Exports on schedule only while the loop runs' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 100,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    $processor->process({}) for 1..3;
+
+    Time::HiRes::sleep 0.3;
+    is $exporter->calls, [], 'Nothing exported while the loop does not run';
+
+    run_loop_until sub { $exporter->calls->@* }, 'Exported once the loop ran';
+
+    run_loop 0.3;    # Three more delays with an empty queue
+
+    is $exporter->calls, [
+        [ export => [ {}, {}, {} ], 30_000 ],
+    ], 'Exported the three records once';
+
+    $processor->shutdown->get;
+};
+
+tests 'Waits for the schedule delay' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 400,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    $processor->process({});
+    run_loop 0.2;
+    is $exporter->calls, [], 'Nothing exported before the delay';
+
+    run_loop_until sub { $exporter->calls->@* }, 'Exported after the delay';
+
+    $processor->shutdown->get;
+};
+
+tests 'No scheduled export while another export runs' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # A full batch starts an export immediately
+    $processor->process({}) for 1..2;
+    run_loop_until sub { $exporter->started == 1 }, 'The full batch is exporting';
+
+    $processor->process({});
+    run_loop 0.3;    # Six delays
+
+    is $exporter->started, 1, 'No second export while the first one runs';
+
+    $exporter->release;
+    run_loop_until sub { $exporter->events->@* == 4 }, 'Both exports ended';
+
+    is $exporter->events, [
+        [ start => 2 ],
+        [ end   => 2 ],
+        [ start => 1 ],
+        [ end   => 1 ],
+    ], 'The scheduled export started after the first export ended';
+
+    $processor->shutdown->get;
+};
+
+tests 'A full batch waits for a running scheduled export' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({});
+    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+
+    $processor->process({}) for 1..2;
+    run_loop 0.3;
+
+    is $exporter->started, 1, 'The full batch did not start yet';
+
+    $exporter->release;
+    run_loop_until sub { $exporter->events->@* == 4 }, 'Both exports ended';
+
+    is $exporter->events, [
+        [ start => 1 ],
+        [ end   => 1 ],
+        [ start => 2 ],
+        [ end   => 2 ],
+    ], 'The full batch started after the scheduled export ended';
+
+    $processor->shutdown->get;
+};
+
+tests 'Keeps exporting after a failed dispatch' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    # The workers cannot receive a code reference, so dispatching the
+    # first batch dies. The third record stays in the queue.
+    like warnings {
+        $processor->process( { code => sub { } }, {}, { last => 1 } );
+    }, [ qr/CODE/ ], 'Warned about the failed dispatch';
+
+    run_loop_until sub { $exporter->calls->@* }, 'The remaining record was exported';
+
+    is $exporter->calls, [
+        [ export => [ { last => 1 } ], 30_000 ],
+    ], 'Exported the record that was left in the queue';
+
+    $processor->shutdown->get;
+};
+
+tests 'Flushing waits for a running export' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({});
+    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+
+    my $flush = $processor->force_flush;
+    run_loop 0.2;
+    ok !$flush->is_ready, 'force_flush waits';
+
+    $exporter->release;
+    is $flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+
+    is $exporter->events, [
+        [ start => 1 ],
+        [ end   => 1 ],
+    ], 'The export ended before force_flush returned';
+
+    $processor->shutdown->get;
+};
+
+tests 'Flushing waits for full batches that waited for a scheduled export' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({ id => 'A' });
+    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+
+    # This full batch waits for the scheduled export
+    $processor->process( { id => 'B' }, { id => 'C' } );
+
+    my $flush = $processor->force_flush;
+
+    $exporter->release('A');
+    run_loop_until sub { $exporter->started == 2 }, 'The full batch is exporting';
+    run_loop 0.2;
+
+    ok !$flush->is_ready, 'force_flush waits for the full batch';
+
+    $exporter->release('B');
+    is $flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+
+    is $exporter->events, [
+        [ start => 1 ],
+        [ end   => 1 ],
+        [ start => 2 ],
+        [ end   => 2 ],
+    ], 'Both exports ended before force_flush returned';
+
+    $processor->shutdown->get;
+};
+
+tests 'The delay after a flush counts from the end of the flush' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 400,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # This starts the countdown, and the flush exports the record
+    $processor->process({});
+    my $flush = $processor->force_flush;
+
+    run_loop_until sub { $exporter->started == 1 }, 'The flush is exporting';
+    run_loop 0.2;
+    $exporter->release;
+    is $flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+
+    $processor->process({});
+    run_loop 0.3;
+    is $exporter->started, 1, 'No scheduled export before the delay';
+
+    run_loop_until sub { $exporter->started == 2 }, 'Exported after the delay';
+
+    $processor->shutdown->get;
+};
+
+tests 'Flushing times out while an export runs' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({});
+    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+
+    is $processor->force_flush(0.1)->get, TRACE_EXPORT_TIMEOUT,
+        'force_flush returns a timeout with an empty queue';
+
+    $exporter->release;
+    $processor->shutdown->get;
+};
+
+tests 'Flushing reports a failed running export' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new(
+            result => TRACE_EXPORT_FAILURE,
+        ),
+    );
+
+    $processor->process({});
+    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+
+    my $flush = $processor->force_flush;
+    $exporter->release;
+
+    is $flush->get, TRACE_EXPORT_FAILURE, 'force_flush returns the failure';
+
+    $processor->shutdown->get;
+};
+
+tests 'Cancelling a flush that waits for an export' => sub {
+    # Run this in a separate process, so that a crash fails the test
+    # instead of ending the test run
+    my ( $handle, $script ) = tempfile( SUFFIX => '.pl' );
+    print $handle <<'SCRIPT';
+use strict;
+use warnings;
+use IO::Async::Loop;
+use OpenTelemetry::Processor::Batch;
+use Local::Exporter::Gated;
+use Time::HiRes ();
+
+my $exporter  = Local::Exporter::Gated->new;
+my $processor = OpenTelemetry::Processor::Batch->new(
+    batch_size => 1,
+    exporter   => $exporter,
+);
+
+$processor->process({});
+
+my $deadline = Time::HiRes::time + 10;
+IO::Async::Loop->new->delay_future( after => 0.01 )->get
+    until $exporter->started || Time::HiRes::time > $deadline;
+
+my $flush = $processor->force_flush;
+$flush->cancel;
+
+$exporter->release;
+$processor->shutdown->get;
+print "done\n";
+SCRIPT
+    close $handle;
+
+    open my $pipe, '-|', $^X, '-Ilib', '-It/lib', $script or die $!;
+    my $output = do { local $/; <$pipe> };
+    close $pipe;
+
+    is $?, 0, 'The process exited normally';
+    like $output, qr/^done$/m, 'The process reached the end';
+};
+
+tests 'Shutdown stops the timer' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    $processor->shutdown->get;
+    $exporter->reset;
+
+    $processor->process({});
+    run_loop 0.3;
+
+    is $exporter->calls, [], 'No scheduled export after shutdown';
+};
+
+tests 'Schedule delay' => sub {
+    my $processor;
+
+    is messages {
+        $processor = CLASS->new(
+            schedule_delay => -1,
+            exporter       => my $exporter = Local::Exporter::File->new,
+        );
+
+        $processor->process({});
+        run_loop 0.5;
+
+        is $exporter->calls, [], 'A negative delay falls back to the default';
+    }, [
+        [
+            warning => 'OpenTelemetry',
+            match qr/Schedule delay cannot be negative/,
+        ],
+    ], 'Logged a negative schedule delay';
+
+    $processor->shutdown->get;
+
+    $processor = CLASS->new(
+        schedule_delay => 0,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    $processor->process({});
+    run_loop_until sub { $exporter->calls->@* }, 'A zero delay exports on the next loop iteration';
+
+    $processor->shutdown->get;
 };
 
 done_testing;

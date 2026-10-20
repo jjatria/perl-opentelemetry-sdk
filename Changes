@@ -2,6 +2,16 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * The batch processor now uses OTEL_BSP_SCHEDULE_DELAY (5000
+      milliseconds by default). While the IO::Async loop runs, it exports
+      up to one batch of queued records when the delay has passed since
+      the end of the previous export. A negative delay logs a warning and
+      uses the default. GH #27.
+    * The batch processor does not start a scheduled export while another
+      export runs, and a full batch waits while a scheduled export runs.
+    * force_flush on the batch processor now waits for exports that are
+      still running, within its timeout.
+
 0.101     2026-10-30 00:04:09 GMT
 
     * Fixed a long-standing bug where calling 'shutdown' on a tracer

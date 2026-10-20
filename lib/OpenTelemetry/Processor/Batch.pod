@@ -25,6 +25,10 @@ and will therefore use whatever event loop is returned by L<IO::Async::Loop>.
 Please refer to the documentation of those modules for details on how to
 control this.
 
+The processor reads the results of the workers, and counts down the
+L</schedule_delay>, through that same loop. The application must run the
+IO::Async loop for either of these to happen.
+
 =head1 METHODS
 
 This class implements the L<OpenTelemetry::Processor> role. Please consult
@@ -73,15 +77,19 @@ records will be removed from the queue until there is enough space for the
 newer ones. If this happens, the code will call L</report_dropped> with
 the C<buffer-full> reason and the number of records that were dropped.
 
-=item C<schedule delay>
+=item C<schedule_delay>
 
-The minimum delay in milliseconds between calls to
-L<OpenTelemetry::Exporter/export>. If not set, this will read the default
-value from the
+The delay in milliseconds before a scheduled export. If not set, this will
+read the default value from the
 L<"OTEL_BSP_SCHEDULE_DELAY"|OpenTelemetry::SDK/OTEL_BSP_SCHEDULE_DELAY>
-environment variable, which in turn defaults to 5000.
+environment variable, which in turn defaults to 5000. A negative value logs
+a warning and uses the default.
 
-Note: this is not yet implemented.
+The countdown starts when the queue has records and no export is running,
+so the delay counts from the end of the previous export. When the delay
+ends, the processor exports up to C<batch_size> records. The countdown uses
+an L<IO::Async::Timer::Countdown> in the IO::Async loop, so scheduled exports
+only happen while the loop runs.
 
 =back
 
@@ -91,10 +99,12 @@ Note: this is not yet implemented.
 
 Takes a list of records that are ready for processing. Once called, this
 method will queue them for eventual processing. Once enough records have
-been queued, a batch of them will be sent to the configured exporter.
+been queued, a batch of them will be sent to the configured exporter. While
+the IO::Async loop runs, a smaller batch is also sent after the
+L</schedule_delay>.
 
-Since this processor works only when a batch is ready, it can sometimes make
-for more complicated debugging. For a simpler processor that handles each
+Since this processor exports records some time after they are queued, it
+can sometimes make for more complicated debugging. For a simpler processor that handles each
 record as it becomes ready and blocks during the export step, see
 L<OpenTelemetry::Processor::Simple>.
 
@@ -128,13 +138,20 @@ subclasses.
 
 Empties the internal queue by sending any unexported records to the exporter.
 
-Takes an optional timeout in seconds. If this has been set, any records
-remaining after the time has run out will be dropped and the number of dropped
+Takes an optional timeout in seconds.
+
+If exports are still running when this method is called, it first waits for
+them to end. If they do not end before the timeout, it returns a timeout
+result, and the records in the queue stay there for a later export. If one of
+the running exports failed, it returns that result.
+
+It then sends the records in the queue. If the timeout runs out while it
+does this, the remaining records will be dropped and the number of dropped
 spans will be reported with L</report_dropped> with the C<force-flush> reason.
 
-This method will also call L<"force_flush"|OpenTelemetry::Exporter/force_flush>
-on the configured exporter. It returns a L<Future> that will hold the result
-of that operation.
+When all of this succeeds, this method will also call
+L<"force_flush"|OpenTelemetry::Exporter/force_flush> on the configured
+exporter. It returns a L<Future> that will hold the result of that operation.
 
 =head2 shutdown
 
@@ -174,6 +191,8 @@ immediately before a batch is picked up for processing.
 =item L<IO::Async::Function>
 
 =item L<IO::Async::Loop>.
+
+=item L<IO::Async::Timer::Countdown>
 
 =item L<Metrics::Any>
 
