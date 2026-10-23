@@ -2,8 +2,9 @@ use Object::Pad;
 
 # An exporter that records when each export starts, and then waits until
 # the test releases it. The test can release every export, or only the
-# export whose first record has a given id. Exports run in worker
-# processes, so the records and the release go through files.
+# export whose first record has a given id. If the first record has a
+# result, the export returns it. Exports run in worker processes, so the
+# records and the release go through files.
 class Local::Exporter::Gated :does(OpenTelemetry::Exporter) {
     use File::Temp 'tempdir';
     use Future::AsyncAwait;
@@ -33,7 +34,8 @@ class Local::Exporter::Gated :does(OpenTelemetry::Exporter) {
     method export ( $batch, @ ) {
         $self->$log( start => scalar @$batch );
 
-        my $id = ref $batch->[0] eq 'HASH' ? $batch->[0]{id} : undef;
+        my $first = ref $batch->[0] eq 'HASH' ? $batch->[0] : {};
+        my $id    = $first->{id};
         my $released = sub {
             -e "$dir/release" || ( defined $id && -e "$dir/release.$id" );
         };
@@ -45,7 +47,7 @@ class Local::Exporter::Gated :does(OpenTelemetry::Exporter) {
         die "The test did not release the exporter\n" unless $released->();
 
         $self->$log( end => scalar @$batch );
-        return $result;
+        return $first->{result} // $result;
     }
 
     async method force_flush { 0 }

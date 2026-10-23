@@ -16,8 +16,13 @@ Revision history for OpenTelemetry-SDK
       uses the default. GH #27.
     * The batch processor does not start a scheduled export while another
       export runs.
-    * force_flush on the batch processor now waits for exports that are
-      still running, within its timeout.
+    * force_flush on the batch processor now waits, within its timeout,
+      for every export of the records that it received before the call,
+      including exports that were already running. When it times out,
+      it no longer drops the records that it did not export: they stay
+      in the queue.
+    * shutdown on the batch processor waits for every export, also for
+      calls that wait for a worker, before it stops the workers.
 
 0.100     2026-10-11 23:18:42 BST
 
