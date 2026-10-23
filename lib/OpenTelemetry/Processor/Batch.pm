@@ -52,9 +52,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     field @queue;
 
     # Start the countdown to the next scheduled export, unless it already
-    # runs, an export is running, or the queue is empty. Since it does not
-    # start while an export runs, the delay counts from the end of the
-    # previous export.
+    # runs, an export is running, or the queue is empty.
     method $start_timer_if_idle () {
         return unless $timer && $timer->loop;
         return if $timer->is_running || %running || !@queue;
@@ -62,9 +60,13 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     # Keep the future of an export in %running until the export ends.
-    # When the last running export ends, start the countdown to the next
-    # scheduled export. Returns the future.
+    # Every export stops the countdown when it starts, and when the last
+    # running export ends, the countdown starts again. So the countdown
+    # never runs while an export runs, and the delay counts from the end of
+    # the previous export. Returns the future.
     method $track_running_export ( $future ) {
+        $timer->stop if $timer && $timer->loop;
+
         my $key = refaddr $future;
         $running{$key} = $future;
 
@@ -79,10 +81,6 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     # Export a full batch from the queue. It does not wait for the timer,
     # or for other exports that are running.
     method $export_batch ( $batch ) {
-        # This export starts now, so stop the countdown. The end of this
-        # export schedules the next one.
-        $timer->stop if $timer && $timer->loop;
-
         my $count = scalar @$batch;
         try {
             # Retain the future so we don't have to wait for it ourselves
@@ -106,10 +104,6 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     async method $export_on_timer () {
-        # Another export started after the timer did. Its end will
-        # schedule the next export.
-        return if %running;
-
         my $batch = $lock->enter( sub { [ splice @queue, 0, $batch_size ] } );
         return unless @$batch;
 
@@ -125,6 +119,10 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         }
         catch ($e) {
             $self->report_result( EXPORT_RESULT_FAILURE, $count );
+
+            # If the export could not be dispatched, nothing ends to start
+            # the countdown for the records left in the queue
+            $self->$start_timer_if_idle;
         }
     }
 
@@ -250,13 +248,16 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         await $exporter->shutdown( maybe_timeout $timeout, $start );
     }
 
-    async method $flush ( $timeout = undef ) {
+    async method force_flush ( $timeout = undef ) {
         return EXPORT_RESULT_SUCCESS if $done;
 
         my $start = timeout_timestamp;
 
         # Wait for exports that are still running, so that their records
-        # have been exported when we return
+        # have been exported when we return. This wait comes before the
+        # defer block below: if the future of an async method is cancelled
+        # while it waits, after it has reached a defer block that uses its
+        # variables, perl crashes (Future::AsyncAwait 0.71).
         if ( my @pending = values %running ) {
             my $all = Future->wait_all( map $_->without_cancel, @pending );
 
@@ -314,23 +315,6 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         }
 
         await $exporter->force_flush( maybe_timeout $timeout, $start );
-    }
-
-    # This is not an async method, so that cancelling the future it returns
-    # does not have to unwind a defer block in an async method while it
-    # waits for running exports. With Future::AsyncAwait 0.71 on Perl 5.44,
-    # that crashes the interpreter.
-    method force_flush ( $timeout = undef ) {
-        # The flush exports the queue now, so stop the countdown. The end
-        # of the flush schedules the next export.
-        $timer->stop if $timer && $timer->loop;
-
-        $self->$flush($timeout)->on_ready( sub {
-            # The countdown may have started during the flush. Start it
-            # again, so that the delay counts from the end of the flush.
-            $timer->stop if $timer && $timer->loop;
-            $self->$start_timer_if_idle;
-        });
     }
 
     method DESTROY {
