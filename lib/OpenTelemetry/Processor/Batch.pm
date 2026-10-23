@@ -48,8 +48,6 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     field $done :reader;
     field $function;
     field $timer;
-    field $scheduled_export;
-    field $flushing = 0;
     field %running;
     field @queue;
 
@@ -58,7 +56,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     # delay counts from the end of the previous export.
     method $schedule () {
         return unless $timer && $timer->loop;
-        return if $timer->is_running || $flushing || %running || !@queue;
+        return if $timer->is_running || %running || !@queue;
         $timer->start;
     }
 
@@ -76,8 +74,8 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         });
     }
 
-    # Export one batch from the queue. A full batch does not wait for the
-    # timer, but it waits for a running scheduled export.
+    # Export a full batch from the queue. It does not wait for the timer,
+    # or for other exports that are running.
     method $export_batch ( $batch ) {
         # This export starts now, so stop the countdown. The end of this
         # export schedules the next one.
@@ -103,45 +101,25 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         return;
     }
 
-    # Export the full batches that waited for a scheduled export. If a
-    # flush runs, leave them to the flush, so that it waits for them.
-    method $export_full_batches () {
-        return if $flushing;
-
-        while (
-            my $batch = $lock->enter( sub {
-                @queue >= $batch_size ? [ splice @queue, 0, $batch_size ] : undef;
-            })
-        ) {
-            $self->$export_batch($batch);
-        }
-
-        $self->$schedule;
-    }
-
     async method $export_on_timer () {
         # Another export started after the timer did. Its end will
         # schedule the next export.
-        return if $flushing || %running;
+        return if %running;
 
         my $batch = $lock->enter( sub { [ splice @queue, 0, $batch_size ] } );
         return unless @$batch;
 
         my $count = scalar @$batch;
         try {
-            $scheduled_export = $self->$track(
+            my $result = await $self->$track(
                 $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
             );
 
-            my $result = await $scheduled_export;
             $self->report_result( $result, $count );
         }
         catch ($e) {
             $self->report_result( EXPORT_RESULT_FAILURE, $count );
         }
-
-        undef $scheduled_export;
-        $self->$export_full_batches;
     }
 
     ADJUST {
@@ -214,9 +192,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
                     push @queue, @items;
 
-                    # A full batch waits while a scheduled export runs, so
-                    # the two do not run at the same time
-                    if ( @queue < $batch_size || $scheduled_export ) {
+                    if ( @queue < $batch_size ) {
                         $self->$schedule;
                         return [];
                     }
@@ -341,10 +317,10 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         # of the flush schedules the next export.
         $timer->stop if $timer && $timer->loop;
 
-        $flushing++;
-
         $self->$flush($timeout)->on_ready( sub {
-            $flushing--;
+            # The countdown may have started during the flush. Start it
+            # again, so that the delay counts from the end of the flush.
+            $timer->stop if $timer && $timer->loop;
             $self->$schedule;
         });
     }

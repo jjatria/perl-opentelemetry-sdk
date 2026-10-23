@@ -160,34 +160,6 @@ tests 'No scheduled export while another export runs' => sub {
     $processor->shutdown->get;
 };
 
-tests 'A full batch waits for a running scheduled export' => sub {
-    my $processor = CLASS->new(
-        batch_size     => 2,
-        schedule_delay => 50,
-        exporter       => my $exporter = Local::Exporter::Gated->new,
-    );
-
-    $processor->process({});
-    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
-
-    $processor->process({}) for 1..2;
-    run_loop 0.3;
-
-    is $exporter->started, 1, 'The full batch did not start yet';
-
-    $exporter->release;
-    run_loop_until sub { $exporter->events->@* == 4 }, 'Both exports ended';
-
-    is $exporter->events, [
-        [ start => 1 ],
-        [ end   => 1 ],
-        [ start => 2 ],
-        [ end   => 2 ],
-    ], 'The full batch started after the scheduled export ended';
-
-    $processor->shutdown->get;
-};
-
 tests 'Keeps exporting after a failed dispatch' => sub {
     my $processor = CLASS->new(
         batch_size     => 2,
@@ -234,7 +206,7 @@ tests 'Flushing waits for a running export' => sub {
     $processor->shutdown->get;
 };
 
-tests 'Flushing waits for full batches that waited for a scheduled export' => sub {
+tests 'Flushing waits for every running export' => sub {
     my $processor = CLASS->new(
         batch_size     => 2,
         schedule_delay => 50,
@@ -244,13 +216,15 @@ tests 'Flushing waits for full batches that waited for a scheduled export' => su
     $processor->process({ id => 'A' });
     run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
 
-    # This full batch waits for the scheduled export
     $processor->process( { id => 'B' }, { id => 'C' } );
+    run_loop_until sub { $exporter->started == 2 },
+        'The full batch exports while the scheduled export runs';
 
     my $flush = $processor->force_flush;
 
     $exporter->release('A');
-    run_loop_until sub { $exporter->started == 2 }, 'The full batch is exporting';
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The scheduled export ended';
     run_loop 0.2;
 
     ok !$flush->is_ready, 'force_flush waits for the full batch';
@@ -260,8 +234,8 @@ tests 'Flushing waits for full batches that waited for a scheduled export' => su
 
     is $exporter->events, [
         [ start => 1 ],
-        [ end   => 1 ],
         [ start => 2 ],
+        [ end   => 1 ],
         [ end   => 2 ],
     ], 'Both exports ended before force_flush returned';
 
