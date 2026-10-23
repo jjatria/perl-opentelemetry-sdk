@@ -87,7 +87,9 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         try {
             # Retain the future so we don't have to wait for it ourselves
             $self->$track_running_export(
-                $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
+                $function->call(
+                    args => [ $exporter, $batch, $exporter_timeout ],
+                )
             )->on_ready( sub ( $f ) {
                 return $self->report_result( EXPORT_RESULT_FAILURE, $count )
                     unless $f->is_done;
@@ -114,7 +116,9 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         my $count = scalar @$batch;
         try {
             my $result = await $self->$track_running_export(
-                $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
+                $function->call(
+                    args => [ $exporter, $batch, $exporter_timeout ],
+                )
             );
 
             $self->report_result( $result, $count );
@@ -295,7 +299,9 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             my $count = scalar @$batch;
             try {
                 my $result = await $self->$track_running_export(
-                    $function->call( args => [ $exporter, $batch, $remaining ] )
+                    $function->call(
+                        args => [ $exporter, $batch, $remaining ],
+                    )
                 );
 
                 $self->report_result( $result, $count );

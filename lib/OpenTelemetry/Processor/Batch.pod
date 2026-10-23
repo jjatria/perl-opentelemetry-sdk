@@ -104,9 +104,9 @@ the IO::Async loop runs, a smaller batch is also sent after the
 L</schedule_delay>.
 
 Since this processor exports records some time after they are queued, it
-can sometimes make for more complicated debugging. For a simpler processor that handles each
-record as it becomes ready and blocks during the export step, see
-L<OpenTelemetry::Processor::Simple>.
+can sometimes make for more complicated debugging. For a simpler processor
+that handles each record as it becomes ready and blocks during the export
+step, see L<OpenTelemetry::Processor::Simple>.
 
 =head2 report_dropped
 

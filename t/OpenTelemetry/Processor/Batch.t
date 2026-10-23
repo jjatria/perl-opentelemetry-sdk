@@ -140,7 +140,8 @@ tests 'No scheduled export while another export runs' => sub {
 
     # A full batch starts an export immediately
     $processor->process({}) for 1..2;
-    run_loop_until sub { $exporter->started == 1 }, 'The full batch is exporting';
+    run_loop_until sub { $exporter->started == 1 },
+        'The full batch is exporting';
 
     $processor->process({});
     run_loop 0.3;    # Six delays
@@ -173,7 +174,8 @@ tests 'Keeps exporting after a failed dispatch' => sub {
         $processor->process( { code => sub { } }, {}, { last => 1 } );
     }, [ qr/CODE/ ], 'Warned about the failed dispatch';
 
-    run_loop_until sub { $exporter->calls->@* }, 'The remaining record was exported';
+    run_loop_until sub { $exporter->calls->@* },
+        'The remaining record was exported';
 
     is $exporter->calls, [
         [ export => [ { last => 1 } ], 30_000 ],
@@ -189,7 +191,8 @@ tests 'Flushing waits for a running export' => sub {
     );
 
     $processor->process({});
-    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
 
     my $flush = $processor->force_flush;
     run_loop 0.2;
@@ -214,7 +217,8 @@ tests 'Flushing waits for every running export' => sub {
     );
 
     $processor->process({ id => 'A' });
-    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
 
     $processor->process( { id => 'B' }, { id => 'C' } );
     run_loop_until sub { $exporter->started == 2 },
@@ -273,7 +277,8 @@ tests 'Flushing times out while an export runs' => sub {
     );
 
     $processor->process({});
-    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
 
     is $processor->force_flush(0.1)->get, TRACE_EXPORT_TIMEOUT,
         'force_flush returns a timeout with an empty queue';
@@ -291,7 +296,8 @@ tests 'Flushing reports a failed running export' => sub {
     );
 
     $processor->process({});
-    run_loop_until sub { $exporter->started == 1 }, 'The scheduled export is running';
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
 
     my $flush = $processor->force_flush;
     $exporter->release;
@@ -385,7 +391,8 @@ tests 'Schedule delay' => sub {
     );
 
     $processor->process({});
-    run_loop_until sub { $exporter->calls->@* }, 'A zero delay exports on the next loop iteration';
+    run_loop_until sub { $exporter->calls->@* },
+        'A zero delay exports on the next loop iteration';
 
     $processor->shutdown->get;
 };
