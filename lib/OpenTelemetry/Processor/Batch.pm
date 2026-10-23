@@ -51,18 +51,20 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     field %running;
     field @queue;
 
-    # Start the countdown to the next scheduled export. It only runs while
-    # there are records in the queue and no export is running, so the
-    # delay counts from the end of the previous export.
-    method $schedule () {
+    # Start the countdown to the next scheduled export, unless it already
+    # runs, an export is running, or the queue is empty. Since it does not
+    # start while an export runs, the delay counts from the end of the
+    # previous export.
+    method $start_timer_if_idle () {
         return unless $timer && $timer->loop;
         return if $timer->is_running || %running || !@queue;
         $timer->start;
     }
 
-    # Keep track of an export until it ends. When the last running export
-    # ends, schedule the next one.
-    method $track ( $future ) {
+    # Keep the future of an export in %running until the export ends.
+    # When the last running export ends, start the countdown to the next
+    # scheduled export. Returns the future.
+    method $track_running_export ( $future ) {
         my $key = refaddr $future;
         $running{$key} = $future;
 
@@ -70,7 +72,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         $future->on_ready( sub {
             return unless $weak;
             delete $running{$key};
-            $weak->$schedule;
+            $weak->$start_timer_if_idle;
         });
     }
 
@@ -84,7 +86,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         my $count = scalar @$batch;
         try {
             # Retain the future so we don't have to wait for it ourselves
-            $self->$track(
+            $self->$track_running_export(
                 $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
             )->on_ready( sub ( $f ) {
                 return $self->report_result( EXPORT_RESULT_FAILURE, $count )
@@ -95,7 +97,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         }
         catch ($e) {
             warn $e;
-            $self->$schedule;
+            $self->$start_timer_if_idle;
         }
 
         return;
@@ -111,7 +113,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
         my $count = scalar @$batch;
         try {
-            my $result = await $self->$track(
+            my $result = await $self->$track_running_export(
                 $function->call( args => [ $exporter, $batch, $exporter_timeout ] )
             );
 
@@ -193,7 +195,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                     push @queue, @items;
 
                     if ( @queue < $batch_size ) {
-                        $self->$schedule;
+                        $self->$start_timer_if_idle;
                         return [];
                     }
 
@@ -292,7 +294,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
             my $count = scalar @$batch;
             try {
-                my $result = await $self->$track(
+                my $result = await $self->$track_running_export(
                     $function->call( args => [ $exporter, $batch, $remaining ] )
                 );
 
@@ -321,7 +323,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             # The countdown may have started during the flush. Start it
             # again, so that the delay counts from the end of the flush.
             $timer->stop if $timer && $timer->loop;
-            $self->$schedule;
+            $self->$start_timer_if_idle;
         });
     }
 
