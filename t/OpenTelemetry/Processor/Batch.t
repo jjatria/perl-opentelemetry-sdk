@@ -223,6 +223,28 @@ tests 'Keeps exporting after a failed dispatch' => sub {
     $processor->shutdown->get;
 };
 
+tests 'Keeps exporting after a failed scheduled dispatch' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::File->new,
+    );
+
+    # The first two records make a full batch. The scheduled export of the
+    # next two cannot be dispatched, and the last record stays in the queue
+    $processor->process( {}, {}, { code => sub { } }, {}, { last => 1 } );
+
+    run_loop_until sub { $exporter->calls->@* == 2 },
+        'The remaining record was exported';
+
+    is $exporter->calls, [
+        [ export => [ {}, {} ], 30_000 ],
+        [ export => [ { last => 1 } ], 30_000 ],
+    ], 'Exported the full batch and the record left in the queue';
+
+    $processor->shutdown->get;
+};
+
 tests 'Flushing waits for a running export' => sub {
     my $processor = CLASS->new(
         schedule_delay => 50,
