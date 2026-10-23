@@ -20,9 +20,10 @@ sub run_loop ( $seconds ) {
     IO::Async::Loop->new->delay_future( after => $seconds )->get;
 }
 
-# Run the loop until the condition is true, with a generous watchdog
-sub run_loop_until ( $condition, $name ) {
-    my $deadline = Time::HiRes::time + 10;
+# Run the loop until the condition is true, or until the timeout in
+# seconds runs out. The default timeout is a generous watchdog.
+sub run_loop_until ( $condition, $name, $timeout = 10 ) {
+    my $deadline = Time::HiRes::time + $timeout;
     run_loop 0.01 until $condition->() || Time::HiRes::time > $deadline;
     ok $condition->(), $name;
 }
@@ -157,6 +158,44 @@ tests 'No scheduled export while another export runs' => sub {
         [ start => 1 ],
         [ end   => 1 ],
     ], 'The scheduled export started after the first export ended';
+
+    $processor->shutdown->get;
+};
+
+tests 'No scheduled export until every running export ends' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # Two full batches export at the same time
+    $processor->process( { id => 'A' }, {} );
+    $processor->process( { id => 'B' }, {} );
+    run_loop_until sub { $exporter->started == 2 },
+        'Both full batches are exporting';
+
+    $processor->process({});
+
+    $exporter->release('A');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The first full batch ended';
+    run_loop 0.3;    # Six delays
+
+    is $exporter->started, 2,
+        'No scheduled export while the second full batch exports';
+
+    $exporter->release;
+    run_loop_until sub { $exporter->events->@* == 6 }, 'All exports ended';
+
+    is $exporter->events, [
+        [ start => 2 ],
+        [ start => 2 ],
+        [ end   => 2 ],
+        [ end   => 2 ],
+        [ start => 1 ],
+        [ end   => 1 ],
+    ], 'The scheduled export started after both full batches ended';
 
     $processor->shutdown->get;
 };
@@ -308,8 +347,12 @@ tests 'Flushing reports a failed running export' => sub {
 };
 
 tests 'Cancelling a flush that waits for an export' => sub {
-    # Run this in a separate process, so that a crash fails the test
-    # instead of ending the test run
+    # If the future of an async sub or method is cancelled while it waits,
+    # after it has reached a defer block that uses one of its variables,
+    # perl crashes with a segmentation fault (Future::AsyncAwait 0.71).
+    # Cancelling force_flush while it waits for a running export must not
+    # do that. Run this in a separate process, so that a crash fails this
+    # test instead of ending the test run
     my ( $handle, $script ) = tempfile( SUFFIX => '.pl' );
     print $handle <<'SCRIPT';
 use strict;
@@ -391,8 +434,11 @@ tests 'Schedule delay' => sub {
     );
 
     $processor->process({});
+    # The export runs in a worker, so the test cannot see on which
+    # iteration of the loop it started. It can see that the processor did
+    # not use the default delay of 5 seconds.
     run_loop_until sub { $exporter->calls->@* },
-        'A zero delay exports on the next loop iteration';
+        'A zero delay does not wait for the default delay', 3;
 
     $processor->shutdown->get;
 };
