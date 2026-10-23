@@ -333,10 +333,9 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                 $timer->stop;
                 $loop->remove($timer);
             }
-        }
-        catch ($e) { }
 
-        try { $function->stop if $function }
+            $function->stop if $function;
+        }
         catch ($e) { }
     }
 }
