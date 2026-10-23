@@ -16,7 +16,6 @@ class Local::Exporter::Gated :does(OpenTelemetry::Exporter) {
     method $log ( @args ) {
         open my $handle, '>>', "$dir/events" or die $!;
         print $handle encode_json( [ @args ] ), "\n";
-        close $handle;
     }
 
     method events {
@@ -29,7 +28,6 @@ class Local::Exporter::Gated :does(OpenTelemetry::Exporter) {
     method release ( $id = undef ) {
         my $file = defined $id ? "$dir/release.$id" : "$dir/release";
         open my $handle, '>', $file or die $!;
-        close $handle;
     }
 
     method export ( $batch, @ ) {
