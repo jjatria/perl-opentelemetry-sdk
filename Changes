@@ -5,10 +5,14 @@ Revision history for OpenTelemetry-SDK
     * Fixed a long-standing bug where calling 'shutdown' on a tracer
       or logger provider would not correctly propagate a call to
       'force_flush' in the configured processors.
-    * While the batch processor continues to tell its underlying worker
-      function to stop during destruction, it no longer blocks until it
-      does. This should prevent some applications from being unable to
-      exit cleanly and avoid some issues raised during global destruction.
+    * The batch processor no longer waits for its underlying worker
+      function to stop when it is destroyed during global destruction.
+      This should prevent some applications from being unable to exit
+      cleanly and avoid some issues raised during global destruction.
+      When it is destroyed before that, it still waits, so that the
+      workers do not stay behind as child processes. A processor that
+      a child of a fork inherited does not wait, because the workers
+      belong to the parent. It no longer changes $? while it waits.
 
 0.100     2026-10-11 23:18:42 BST
 

@@ -45,6 +45,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     field $done :reader;
     field $function;
+    field $pid = $$; # The process that starts the workers
     field @queue;
 
     ADJUST {
@@ -190,7 +191,35 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     method DESTROY {
-        try { $function->stop if $function }
+        # During global destruction, the loop does not always notice
+        # that the workers exited, so waiting for them here can block
+        # forever. The workers exit on their own when the pipes to them
+        # close.
+        return if ${^GLOBAL_PHASE} eq 'DESTRUCT';
+
+        # Otherwise wait for the workers, so that the loop reaps them.
+        # If we do not, they stay behind as child processes until
+        # something else waits for them. Only the process that started
+        # them can wait for them: if a child of a fork inherited this
+        # processor, the workers belong to the parent, and the wait would
+        # block forever. Waiting sets $?, which would change the exit
+        # status of the program if this runs as it exits.
+        local $?;
+
+        try {
+            if ( $function ) {
+                my $stopped = $function->stop;
+
+                if ( $$ == $pid ) {
+                    # If the SIGCHLD of a worker arrives just before the
+                    # loop starts to wait, perl only runs its handler when
+                    # the loop wakes up again (see $MAX_SIGWAIT_TIME in
+                    # IO::Async::Loop). So wake it up at least every second.
+                    my $loop = IO::Async::Loop->new;
+                    $loop->loop_once(1) until $stopped->is_ready;
+                }
+            }
+        }
         catch ($e) { }
     }
 }
