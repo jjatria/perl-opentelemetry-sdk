@@ -15,7 +15,7 @@ Revision history for OpenTelemetry-SDK
       the end of the previous export. A negative delay logs a warning and
       uses the default. GH #27.
     * The batch processor does not start a scheduled export while another
-      export runs, and a full batch waits while a scheduled export runs.
+      export runs.
     * force_flush on the batch processor now waits for exports that are
       still running, within its timeout.
 
