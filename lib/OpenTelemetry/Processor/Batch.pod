@@ -140,14 +140,13 @@ Empties the internal queue by sending any unexported records to the exporter.
 
 Takes an optional timeout in seconds.
 
-If exports are still running when this method is called, it first waits for
-them to end. If they do not end before the timeout, it returns a timeout
-result, and the records in the queue stay there for a later export. If one of
-the running exports failed, it returns that result.
-
-It then sends the records in the queue. If the timeout runs out while it
-does this, the remaining records will be dropped and the number of dropped
-spans will be reported with L</report_dropped> with the C<force-flush> reason.
+This method exports the records that are in the queue when it is called,
+one batch of up to C<batch_size> records at a time. It then waits for every
+other export that has a record that the processor received before this call,
+including exports that were already running. If the timeout runs out, it
+returns a timeout result: the records that it did not take stay in the
+queue, and the exports that it started go on. If an export failed, or if a
+batch could not be dispatched, it returns a failure result.
 
 When all of this succeeds, this method will also call
 L<"force_flush"|OpenTelemetry::Exporter/force_flush> on the configured

@@ -245,6 +245,28 @@ tests 'Keeps exporting after a failed scheduled dispatch' => sub {
     $processor->shutdown->get;
 };
 
+tests 'Flushing stops at a batch that cannot be dispatched' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 1,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $exporter->release;
+
+    # A goes out at once. The workers cannot receive the next record, and
+    # the last one stays in the queue.
+    $processor->process( { id => 'A' }, { code => sub { } }, { id => 'C' } );
+
+    is $processor->force_flush->get, TRACE_EXPORT_FAILURE,
+        'force_flush returns a failure';
+
+    run_loop 0.2;
+    is $exporter->started, 1, 'force_flush did not export the last record';
+
+    $processor->shutdown->get;
+};
+
 tests 'Flushing waits for a running export' => sub {
     my $processor = CLASS->new(
         schedule_delay => 50,
@@ -307,6 +329,107 @@ tests 'Flushing waits for every running export' => sub {
     $processor->shutdown->get;
 };
 
+tests 'Flushing exports the records that were queued before it' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({ id => 'A' });
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
+
+    $processor->process({ id => 'B' });
+    my $flush = $processor->force_flush;
+
+    # B is no longer in the queue, so this does not make a full batch
+    $processor->process({ id => 'C' });
+
+    run_loop_until sub { $exporter->started == 2 },
+        'The flush exports B at once';
+
+    $exporter->release('A');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The scheduled export ended';
+    run_loop 0.2;
+
+    ok !$flush->is_ready, 'force_flush waits for the export of B';
+
+    $exporter->release('B');
+    is $flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+
+    is $exporter->events, [
+        [ start => 1 ],
+        [ start => 1 ],
+        [ end   => 1 ],
+        [ end   => 1 ],
+    ], 'The flush exported B on its own';
+
+    $exporter->release;
+    $processor->shutdown->get;
+};
+
+tests 'A flush waits for the exports that another flush started' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({ id => 'A' });
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
+
+    $processor->process({ id => 'B' });
+    my $first  = $processor->force_flush;
+    my $second = $processor->force_flush;
+
+    $exporter->release('A');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The scheduled export ended';
+    run_loop 0.2;
+
+    ok !$first->is_ready,  'The first flush waits for the export of B';
+    ok !$second->is_ready, 'The second flush waits for it too';
+
+    $exporter->release('B');
+    is $first->get,  TRACE_EXPORT_SUCCESS, 'The first flush returns success';
+    is $second->get, TRACE_EXPORT_SUCCESS, 'The second flush returns success';
+    is $exporter->started, 2, 'B was exported once';
+
+    $processor->shutdown->get;
+};
+
+tests 'A flush that times out leaves its exports running' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({ id => 'A' });
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
+
+    $processor->process({ id => 'B' });
+    my $first  = $processor->force_flush(0.1);
+    my $second = $processor->force_flush;
+
+    is $first->get, TRACE_EXPORT_TIMEOUT, 'The first flush times out';
+
+    $exporter->release('A');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The scheduled export ended';
+    run_loop 0.2;
+
+    ok !$second->is_ready, 'The second flush waits for the export of B';
+
+    $exporter->release('B');
+    is $second->get, TRACE_EXPORT_SUCCESS, 'The second flush returns success';
+    is $exporter->started, 2, 'B was exported once';
+
+    $processor->shutdown->get;
+};
+
 tests 'The delay after a flush counts from the end of the flush' => sub {
     my $processor = CLASS->new(
         schedule_delay => 400,
@@ -348,23 +471,225 @@ tests 'Flushing times out while an export runs' => sub {
     $processor->shutdown->get;
 };
 
-tests 'Flushing reports a failed running export' => sub {
+tests 'Flushing does not start exports after the timeout' => sub {
     my $processor = CLASS->new(
-        schedule_delay => 50,
-        exporter       => my $exporter = Local::Exporter::Gated->new(
-            result => TRACE_EXPORT_FAILURE,
-        ),
+        exporter => my $exporter = Local::Exporter::Gated->new,
     );
 
     $processor->process({});
+
+    # No time is left by the time force_flush checks
+    is $processor->force_flush(1e-9)->get, TRACE_EXPORT_TIMEOUT,
+        'force_flush returns a timeout';
+
+    run_loop 0.2;
+    is $exporter->started, 0, 'force_flush did not start an export';
+
+    $exporter->release;
+    $processor->shutdown->get;
+};
+
+tests 'Flushing waits for exports that take its records' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 1,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # A goes out at once, and B and C stay in the queue
+    $processor->process( { id => 'A' }, { id => 'B' }, { id => 'C' } );
+    run_loop_until sub { $exporter->started == 1 }, 'A is exporting';
+
+    my $flush = $processor->force_flush;
+    run_loop_until sub { $exporter->started == 2 }, 'The flush exports B';
+
+    # This makes a full batch with C, which was queued before the flush
+    $processor->process({ id => 'D' });
+    run_loop_until sub { $exporter->started == 3 }, 'A full batch exports C';
+
+    $exporter->release('A');
+    $exporter->release('B');
+    run_loop_until
+        sub { ( grep { $_->[0] eq 'end' } $exporter->events->@* ) == 2 },
+        'A and B ended';
+    run_loop 0.2;
+
+    ok !$flush->is_ready, 'force_flush waits for the export of C';
+
+    $exporter->release('C');
+    is $flush->get, TRACE_EXPORT_SUCCESS, 'force_flush returns success';
+
+    $exporter->release;
+    $processor->shutdown->get;
+};
+
+tests 'Flushing sees a failed dispatch of its records' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # A goes out at once. B stays in the queue, and so does C, which the
+    # workers cannot receive.
+    $processor->process(
+        { id => 'A' }, {},
+        { id => 'B' }, {},
+        { id => 'C', code => sub { } },
+    );
+    run_loop_until sub { $exporter->started == 1 }, 'A is exporting';
+
+    my $flush = $processor->force_flush;
+    run_loop_until sub { $exporter->started == 2 }, 'The flush exports B';
+
+    # This makes a full batch with C, which was queued before the flush,
+    # and dispatching it dies
+    like warnings { $processor->process({ id => 'D' }) }, [ qr/CODE/ ],
+        'Warned about the failed dispatch';
+
+    $exporter->release;
+    is $flush->get, TRACE_EXPORT_FAILURE, 'force_flush returns a failure';
+
+    $processor->shutdown->get;
+};
+
+tests 'Flushing stops at a failed export of the queue' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 2,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $exporter->release;
+
+    # The first two records go out at once, and three stay in the queue.
+    # The export of the next batch fails.
+    $processor->process(
+        { id => 'A' },
+        {},
+        { id => 'B', result => TRACE_EXPORT_FAILURE },
+        {},
+        { id => 'C' },
+    );
+
+    is $processor->force_flush->get, TRACE_EXPORT_FAILURE,
+        'force_flush returns the failure';
+
+    run_loop 0.2;
+    is $exporter->started, 2, 'force_flush did not export the last record';
+
+    $processor->shutdown->get;
+};
+
+tests 'Flushing stops starting exports when it times out' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 1,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # One full batch goes out at once, and the rest stays in the queue
+    $processor->process( map { { id => $_ } } 1 .. 5 );
+    run_loop_until sub { $exporter->started == 1 },
+        'The full batch is exporting';
+
+    is $processor->force_flush(0.1)->get, TRACE_EXPORT_TIMEOUT,
+        'force_flush returns a timeout';
+
+    run_loop 0.2;
+    is $exporter->started, 2, 'force_flush started one export';
+
+    $exporter->release;
+    $processor->shutdown->get;
+};
+
+tests 'Shutdown waits for exports that wait for a worker' => sub {
+    local $ENV{OTEL_PERL_BSP_MAX_WORKERS} = 1;
+
+    my $processor = CLASS->new(
+        batch_size     => 1,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # A goes to the only worker. The flush in shutdown starts an export
+    # for B, which waits for the worker, and the flush times out.
+    $processor->process( { id => 'A' }, { id => 'B' } );
+    run_loop_until sub { $exporter->started == 1 },
+        'The first export is running';
+
+    my $loop = IO::Async::Loop->new;
+    $loop->delay_future( after => 0.3 )
+        ->on_done( sub { $exporter->release('A') } )->retain;
+    $loop->delay_future( after => 0.6 )
+        ->on_done( sub { $exporter->release('B') } )->retain;
+
+    $processor->shutdown(0.1)->get;
+
+    is [ grep { $_->[0] eq 'end' } $exporter->events->@* ],
+        [ [ end => 1 ], [ end => 1 ] ],
+        'Both exports ended before shutdown returned';
+};
+
+tests 'Flushing reports a failed running export' => sub {
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    $processor->process({ id => 'A', result => TRACE_EXPORT_FAILURE });
     run_loop_until sub { $exporter->started == 1 },
         'The scheduled export is running';
 
-    my $flush = $processor->force_flush;
-    $exporter->release;
+    # The export of this record succeeds
+    $processor->process({ id => 'B' });
 
+    my $flush = $processor->force_flush;
+    run_loop_until sub { $exporter->started == 2 }, 'The flush exports B';
+
+    # The failed export ends while the flush still waits for B
+    $exporter->release('A');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The scheduled export ended';
+
+    $exporter->release('B');
     is $flush->get, TRACE_EXPORT_FAILURE, 'force_flush returns the failure';
 
+    $processor->shutdown->get;
+};
+
+tests 'Flushing reports a failed export that took its records' => sub {
+    my $processor = CLASS->new(
+        batch_size     => 1,
+        schedule_delay => 60_000,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
+
+    # A goes out at once, and B and C stay in the queue
+    $processor->process(
+        { id => 'A' },
+        { id => 'B' },
+        { id => 'C', result => TRACE_EXPORT_FAILURE },
+    );
+    run_loop_until sub { $exporter->started == 1 }, 'A is exporting';
+
+    my $flush = $processor->force_flush;
+    run_loop_until sub { $exporter->started == 2 }, 'The flush exports B';
+
+    # A full batch takes C, which was queued before the flush. Its export
+    # fails, and ends while the flush still waits for B.
+    $processor->process({ id => 'D' });
+    run_loop_until sub { $exporter->started == 3 }, 'A full batch exports C';
+
+    $exporter->release('C');
+    run_loop_until sub { grep { $_->[0] eq 'end' } $exporter->events->@* },
+        'The export of C ended';
+
+    $exporter->release('A');
+    $exporter->release('B');
+    is $flush->get, TRACE_EXPORT_FAILURE, 'force_flush returns the failure';
+
+    $exporter->release;
     $processor->shutdown->get;
 };
 
@@ -386,8 +711,8 @@ use Time::HiRes ();
 
 my $exporter  = Local::Exporter::Gated->new;
 my $processor = OpenTelemetry::Processor::Batch->new(
-    batch_size => 1,
-    exporter   => $exporter,
+    schedule_delay => 50,
+    exporter       => $exporter,
 );
 
 $processor->process({});
@@ -396,10 +721,62 @@ my $deadline = Time::HiRes::time + 10;
 IO::Async::Loop->new->delay_future( after => 0.01 )->get
     until $exporter->started || Time::HiRes::time > $deadline;
 
-my $flush = $processor->force_flush;
+# The flush starts an export for this record
+$processor->process({});
+
+my $flush    = $processor->force_flush;
+my $second   = $processor->force_flush;
+my $shutdown = $processor->shutdown;
 $flush->cancel;
 
 $exporter->release;
+print 'second=', $second->get, "\n";
+$shutdown->get;
+print "exported\n" if $exporter->started == 2;
+print "done\n";
+SCRIPT
+    close $handle;
+
+    open my $pipe, '-|', $^X, '-Ilib', '-It/lib', $script or die $!;
+    my $output = do { local $/; <$pipe> };
+    close $pipe;
+
+    is $?, 0, 'The process exited normally';
+    like $output, qr/^second=0$/m,
+        'Cancelling a flush did not stop the exports that it started';
+    like $output, qr/^exported$/m, 'The record in the queue was exported';
+    like $output, qr/^done$/m, 'The process reached the end';
+};
+
+tests 'A flush can wait for another flush in report_result' => sub {
+    # Run this in a separate process, so that a deadlock fails this test
+    # instead of stopping the test run
+    my ( $handle, $script ) = tempfile( SUFFIX => '.pl' );
+    print $handle <<'SCRIPT';
+use strict;
+use warnings;
+use Object::Pad;
+use OpenTelemetry::Processor::Batch;
+use Local::Exporter::File;
+
+class Local::Processor :isa(OpenTelemetry::Processor::Batch) {
+    field $nested;
+
+    method report_result ( $result, $count ) {
+        print 'nested=', $self->force_flush->get, "\n" unless $nested++;
+        return $result;
+    }
+}
+
+alarm 10;
+
+my $processor = Local::Processor->new(
+    exporter => Local::Exporter::File->new,
+);
+
+$processor->process({});
+print 'outer=', $processor->force_flush->get, "\n";
+
 $processor->shutdown->get;
 print "done\n";
 SCRIPT
@@ -410,7 +787,8 @@ SCRIPT
     close $pipe;
 
     is $?, 0, 'The process exited normally';
-    like $output, qr/^done$/m, 'The process reached the end';
+    like $output, qr/^nested=0$/m, 'The flush in report_result returned';
+    like $output, qr/^outer=0$/m, 'The outer flush returned';
 };
 
 tests 'Shutdown stops the timer' => sub {
@@ -440,7 +818,7 @@ tests 'Schedule delay' => sub {
         $processor->process({});
         run_loop 0.5;
 
-        is $exporter->calls, [], 'A negative delay falls back to the default';
+        is $exporter->calls, [], 'A negative delay does not export at once';
     }, [
         [
             warning => 'OpenTelemetry',
