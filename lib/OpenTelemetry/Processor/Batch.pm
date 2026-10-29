@@ -190,7 +190,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     method DESTROY {
-        try { $function->stop if $function }
-        catch ($e) { }
+        return if ${^GLOBAL_PHASE} eq 'DESTRUCT';
+        $function->stop->get if $function;
     }
 }

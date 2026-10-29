@@ -5,10 +5,8 @@ Revision history for OpenTelemetry-SDK
     * Fixed a long-standing bug where calling 'shutdown' on a tracer
       or logger provider would not correctly propagate a call to
       'force_flush' in the configured processors.
-    * While the batch processor continues to tell its underlying worker
-      function to stop during destruction, it no longer blocks until it
-      does. This should prevent some applications from being unable to
-      exit cleanly and avoid some issues raised during global destruction.
+    * The batch processor no longer attempts to block until its
+      underlying worker function to stop during global destruction.
 
 0.100     2026-10-11 23:18:42 BST
 
