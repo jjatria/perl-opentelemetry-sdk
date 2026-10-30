@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+0.101     2026-10-30 00:04:09 GMT
+
     * Fixed a long-standing bug where calling 'shutdown' on a tracer
       or logger provider would not correctly propagate a call to
       'force_flush' in the configured processors.
