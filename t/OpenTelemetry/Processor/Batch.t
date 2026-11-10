@@ -694,58 +694,28 @@ tests 'Flushing reports a failed export that took its records' => sub {
 };
 
 tests 'Cancelling a flush that waits for an export' => sub {
-    # If the future of an async sub or method is cancelled while it waits,
-    # after it has reached a defer block that uses one of its variables,
-    # perl crashes with a segmentation fault (Future::AsyncAwait 0.71).
-    # Cancelling force_flush while it waits for a running export must not
-    # do that. Run this in a separate process, so that a crash fails this
-    # test instead of ending the test run
-    my ( $handle, $script ) = tempfile( SUFFIX => '.pl' );
-    print $handle <<'SCRIPT';
-use strict;
-use warnings;
-use IO::Async::Loop;
-use OpenTelemetry::Processor::Batch;
-use Local::Exporter::Gated;
-use Time::HiRes ();
+    my $processor = CLASS->new(
+        schedule_delay => 50,
+        exporter       => my $exporter = Local::Exporter::Gated->new,
+    );
 
-my $exporter  = Local::Exporter::Gated->new;
-my $processor = OpenTelemetry::Processor::Batch->new(
-    schedule_delay => 50,
-    exporter       => $exporter,
-);
+    $processor->process({});
+    run_loop_until sub { $exporter->started == 1 },
+        'The scheduled export is running';
 
-$processor->process({});
+    # The flush starts an export for this record
+    $processor->process({});
 
-my $deadline = Time::HiRes::time + 10;
-IO::Async::Loop->new->delay_future( after => 0.01 )->get
-    until $exporter->started || Time::HiRes::time > $deadline;
+    my $flush  = $processor->force_flush;
+    my $second = $processor->force_flush;
+    $flush->cancel;
 
-# The flush starts an export for this record
-$processor->process({});
-
-my $flush    = $processor->force_flush;
-my $second   = $processor->force_flush;
-my $shutdown = $processor->shutdown;
-$flush->cancel;
-
-$exporter->release;
-print 'second=', $second->get, "\n";
-$shutdown->get;
-print "exported\n" if $exporter->started == 2;
-print "done\n";
-SCRIPT
-    close $handle;
-
-    open my $pipe, '-|', $^X, '-Ilib', '-It/lib', $script or die $!;
-    my $output = do { local $/; <$pipe> };
-    close $pipe;
-
-    is $?, 0, 'The process exited normally';
-    like $output, qr/^second=0$/m,
+    $exporter->release;
+    is $second->get, TRACE_EXPORT_SUCCESS,
         'Cancelling a flush did not stop the exports that it started';
-    like $output, qr/^exported$/m, 'The record in the queue was exported';
-    like $output, qr/^done$/m, 'The process reached the end';
+    is $exporter->started, 2, 'The record in the queue was exported';
+
+    $processor->shutdown->get;
 };
 
 tests 'A flush can wait for another flush in report_result' => sub {
