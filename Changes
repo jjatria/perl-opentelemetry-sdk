@@ -2,6 +2,10 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+    * Remove OTEL_PERL_BSP_MAX_WORKERS environment variable
+      Because the spec states that "the batching processor MUST synchronize
+      calls to the exporter to make sure they are not invoked concurrently"
+
 0.101     2026-10-30 00:04:09 GMT
 
     * Fixed a long-standing bug where calling 'shutdown' on a tracer

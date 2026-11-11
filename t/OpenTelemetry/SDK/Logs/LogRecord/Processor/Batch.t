@@ -9,11 +9,6 @@ use OpenTelemetry::Constants -trace_export;
 use lib 't/lib';
 use Local::Exporter::File;
 
-local %ENV = (
-    %ENV,
-    OTEL_PERL_BSP_MAX_WORKERS => 1,
-);
-
 describe on_emit => sub {
     my ( $log_record, @calls, @logs );
 
