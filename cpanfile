@@ -1,7 +1,7 @@
 requires 'isa'; # To support perls older than 5.32
 requires 'Feature::Compat::Try';
 requires 'Future::AsyncAwait', '0.38'; # Object::Pad compatibility
-requires 'IO::Async::Loop';
+requires 'IO::Async', '0.805'; # Synchronous-mode channels for the export child
 requires 'Metrics::Any';
 requires 'Mutex';
 requires 'Object::Pad', '0.74'; # For //= field initialisers

@@ -16,14 +16,35 @@ whether this is processing trace spans, log records, or metrics.
 
 This processor is intended to be used in production environments where
 performance is important. It will maintain a queue of records to export, and
-periodically exports these in batches in a parallel process, which should
-allow the main process to continue executing without any delay added by
-the export step.
+periodically exports these in batches through an I<export child>: as soon as
+the first batch is ready, the processor spawns a subprocess that serves the
+exporter, and every later batch is handed over to it through a channel. This
+allows the main process to continue executing without any delay added by
+the export step, and without requiring an event loop to be running. The
+exporter itself is never serialised: the subprocess is a fork of the
+emitting process and uses that process's own copy of the exporter.
 
-The worker processes that do the exporting run in a L<IO::Async::Function>
-and will therefore use whatever event loop is returned by L<IO::Async::Loop>.
-Please refer to the documentation of those modules for details on how to
-control this.
+The specification requires batch processors to synchronise calls to the
+exporter, so a processor runs at most one export at any given time: the
+single export child deals with the batches in the order they were sent.
+
+=head1 FORKED PROCESSES
+
+A processor created in one process cannot reuse the export child of that
+process in a process created with L<perlfunc/fork>: the child belongs to
+the parent, and its command and acknowledgement channels are shared with
+the parent. The processor notices that it has been inherited on its first use
+in the forked process: the inherited channels are closed there (which only
+releases this process's copies of those descriptors, the parent holds its
+own), the inherited queue is dropped because those records still belong to
+the parent's pending export, and the parent's export child is never waited
+for nor signalled by the forked process.
+
+After that, the forked process works as if the processor had been created
+in it: the next batch that is ready spawns a fresh export child of its
+own, so a forked process also exports in the background rather than
+blocking on the export. The locks used internally are recreated in the
+child transparently, see L<OpenTelemetry::SDK::Lock>.
 
 =head1 METHODS
 
@@ -93,6 +114,16 @@ Takes a list of records that are ready for processing. Once called, this
 method will queue them for eventual processing. Once enough records have
 been queued, a batch of them will be sent to the configured exporter.
 
+The batch is handed over to the export child without waiting for it: the
+result of that export cannot be known at the time of the handover, so it
+is not reported through L</report_result>. Only the batches this process
+exports itself (during L</force_flush>) report their results. A batch
+that cannot be handed over to the export child is not exported in this
+process either: that would block the caller for as long as a failing
+exporter takes to time out. It is reported to L</report_dropped> with the
+C<subprocess-failed> reason instead, and the next batch spawns a fresh
+export child.
+
 Since this processor works only when a batch is ready, it can sometimes make
 for more complicated debugging. For a simpler processor that handles each
 record as it becomes ready and blocks during the export step, see
@@ -128,9 +159,12 @@ subclasses.
 
 Empties the internal queue by sending any unexported records to the exporter.
 
-Takes an optional timeout in seconds. If this has been set, any records
-remaining after the time has run out will be dropped and the number of dropped
-spans will be reported with L</report_dropped> with the C<force-flush> reason.
+This operation is synchronous: it blocks until every queued batch has been
+exported and the export child (if one is running) has acknowledged the
+flush order. Takes an optional timeout in seconds. If this has been set, any
+records remaining after the time has run out will be dropped and the number
+of dropped spans will be reported with L</report_dropped> with the
+C<force-flush> reason.
 
 This method will also call L<"force_flush"|OpenTelemetry::Exporter/force_flush>
 on the configured exporter. It returns a L<Future> that will hold the result
@@ -170,10 +204,6 @@ immediately before a batch is picked up for processing.
 =over
 
 =item L<Future>
-
-=item L<IO::Async::Function>
-
-=item L<IO::Async::Loop>.
 
 =item L<Metrics::Any>
 
