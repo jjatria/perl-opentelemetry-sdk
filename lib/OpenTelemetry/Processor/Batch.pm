@@ -63,11 +63,11 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             $batch_size = $max_queue_size;
         }
 
-        # This is a non-standard variable, so we make it Perl-specific
-        my $max_workers = $ENV{OTEL_PERL_BSP_MAX_WORKERS};
-
         $function = IO::Async::Function->new(
-            $max_workers ? ( max_workers => $max_workers ) : (),
+            # The specification requires batch processors to synchronise
+            # calls to the exporter, so a single worker does all the
+            # exporting, one batch at a time.
+            max_workers => 1,
 
             code => sub ( $exporter, $batch, $timeout ) {
                 $exporter->export( $batch, $timeout );
