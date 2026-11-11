@@ -1,0 +1,61 @@
+=encoding UTF-8
+
+=head1 NAME
+
+OpenTelemetry::SDK::Lock - A fork-safe wrapper around Mutex
+
+=head1 SYNOPSIS
+
+    my $lock = OpenTelemetry::SDK::Lock->new;
+
+    $lock->enter(sub { ... critical section ... });
+
+=head1 DESCRIPTION
+
+This class implements the internal locks used by the SDK providers and the
+L<OpenTelemetry::Processor::Batch> processor. It wraps a L<Mutex>, which is
+itself only safe within the process that created it: after a
+L<perlfunc/fork>, the inherited lock still refers to the token pipes created
+in the parent, and entering it in the child would block forever (or read
+from whatever handle has since recycled those descriptor numbers).
+
+The wrapper records the process that created the lock. On the first use in a
+different process, it rebuilds the inner mutex before touching any of the
+inherited state, so an object that owns one of these locks (a provider, a
+batch processor) keeps working in a forked process without any explicit
+child-initialisation step.
+
+=head1 METHODS
+
+=head2 new
+
+    $lock = OpenTelemetry::SDK::Lock->new;
+
+Creates a new lock in the current process.
+
+=head2 enter
+
+    $result = $lock->enter(sub { ... });
+
+Runs the given code block while holding the lock and returns its result. If
+the lock turns out to have been inherited from another process, the lock is
+rebuilt first.
+
+=head1 SEE ALSO
+
+=over
+
+=item L<Mutex>
+
+=item L<OpenTelemetry::Processor::Batch/FORKED PROCESSES>
+
+=item L<OpenTelemetry::SDK/FORKING>
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2026 by Alexander Hartmaier.
+
+This is free software; you can redistribute it and/or modify it under the same
+terms as the Perl 5 programming language system itself.

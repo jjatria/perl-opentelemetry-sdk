@@ -605,6 +605,24 @@ requires it. Invalid or unrecognised input will be logged and will be ignored.
 
 =back
 
+=head1 FORKING
+
+The SDK is safe to use after a L<perlfunc/fork>. Locks created in the parent
+process are rebuilt transparently in the child when first used there (see
+L<OpenTelemetry::SDK::Lock>), so providers inherited across a fork keep
+working without any child-initialisation step. Batch processors do not
+reuse the export child they inherited from the parent: the forked process
+closes the inherited pipes and spawns a fresh export child for its next
+batch, so every process of the family exports in the background without
+ever sharing a subprocess or a pipe with another one (see
+L<OpenTelemetry::Processor::Batch/FORKED PROCESSES>).
+
+When an exporter writes to a socket, a collector closing the connection
+during a request surfaces as a L<perlfunc/SIGPIPE> whose default disposition
+terminates the process. The configuration functions set C<$SIG{PIPE}> to
+C<IGNORE> (unless the application installed its own handler) so that the write
+fails with EPIPE and reports a failed export instead of killing the process.
+
 =head1 SEE ALSO
 
 =over

@@ -11,11 +11,11 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     use Feature::Compat::Try;
     use Future::AsyncAwait;
     use List::Util 'any';
-    use Mutex;
     use OpenTelemetry::Common qw( config timeout_timestamp maybe_timeout );
     use OpenTelemetry::Constants -export;
     use OpenTelemetry::Propagator::TraceContext::TraceFlags;
     use OpenTelemetry::SDK::InstrumentationScope;
+    use OpenTelemetry::SDK::Lock;
     use OpenTelemetry::SDK::Resource;
     use OpenTelemetry::SDK::Trace::Sampler::AlwaysOff;
     use OpenTelemetry::SDK::Trace::Sampler::AlwaysOn;
@@ -34,8 +34,8 @@ class OpenTelemetry::SDK::Trace::TracerProvider :isa(OpenTelemetry::Trace::Trace
     field %registry;
     field @processors;
 
-    field $lock          //= Mutex->new;
-    field $registry_lock //= Mutex->new;
+    field $lock          //= OpenTelemetry::SDK::Lock->new;
+    field $registry_lock //= OpenTelemetry::SDK::Lock->new;
 
     my $logger = OpenTelemetry::Common::internal_logger;
 
