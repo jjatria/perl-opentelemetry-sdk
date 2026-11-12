@@ -237,6 +237,16 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             # $close_other_fds.
             $close_other_fds->( fileno $cmd_child, fileno $ack_child );
 
+            # Drop every signal handler the emitting process installed:
+            # a handler that dies (a request timeout one, most likely)
+            # would otherwise run in this process the next time its
+            # signal arrives, doing the parent's shutdown work against
+            # the parent's state. With the handlers gone, each signal
+            # does what it would have done before the application took
+            # it over, which is the honest behaviour for a subprocess.
+            $SIG{$_} = 'DEFAULT'
+                for grep { ref $SIG{$_} eq 'CODE' } keys %SIG;
+
             # The child must not die on a broken pipe while answering,
             # and must not run any inherited __DIE__ handler; it leaves
             # through _exit so no END block or destructor of the process
