@@ -15,15 +15,53 @@ is intended to implement the core behaviours that are needed regardless of
 whether this is processing trace spans, log records, or metrics.
 
 This processor is intended to be used in production environments where
-performance is important. It will maintain a queue of records to export, and
-periodically exports these in batches in a parallel process, which should
-allow the main process to continue executing without any delay added by
-the export step.
+performance is important. Records handed to it are sent to an I<export
+child>: as soon as the first record arrives, the processor spawns a
+subprocess that owns the queue of records, the batch boundaries, and the
+schedule, and exports them through the exporter on its own. This allows
+the main process to continue executing without any delay added by the
+export step, and without requiring an event loop to be running: the
+subprocess runs a selector loop with the schedule deadline as its
+timeout, which is what lets it export a partially filled batch on time
+even when the emitting process stops sending records. The exporter itself
+is never serialised: the subprocess is a fork of the emitting process and
+uses that process's own copy of the exporter.
 
-The worker processes that do the exporting run in a L<IO::Async::Function>
-and will therefore use whatever event loop is returned by L<IO::Async::Loop>.
-Please refer to the documentation of those modules for details on how to
-control this.
+The specification requires batch processors to synchronise calls to the
+exporter, so a processor runs at most one export at any given time: the
+single export child deals with the records in the order they were sent.
+
+=head1 FORKED PROCESSES
+
+A processor created in one process cannot reuse the export child of that
+process in a process created with L<perlfunc/fork>: the child belongs to
+the parent, it holds the records the parent sent it, and its command and
+acknowledgement channels are shared with the parent. The processor
+notices that it has been inherited on its first use in the forked
+process: the inherited channels are closed there (which only releases
+this process's copies of those descriptors, the parent holds its own),
+and the parent's export child is never waited for nor signalled by the
+forked process.
+
+After that, the forked process works as if the processor had been created
+in it: the next record received spawns a fresh export child of its own,
+so a forked process also exports in the background rather than blocking
+on the export. The locks used internally are recreated in the child
+transparently, see L<OpenTelemetry::SDK::Lock>.
+
+The export child itself is forked from the middle of whatever the
+emitting process was doing, so it closes every descriptor it inherited
+except standard input and output and the channels it runs on. Anything
+else belonged to the emitting process: an accepted client connection
+whose copy the export child kept alive would have stayed open after the
+serving process closed its own, leaving a client talking to a live
+connection that no process will ever read again. A fork that leaves such
+descriptors behind tends to hang clients rather than crash them, which
+is why the subprocess sweeps them at the start. Signal handlers are
+dropped the same way: a handler that dies (a request timeout one, most
+likely) would otherwise run inside the subprocess on the next signal,
+done against the wrong process's state. Without it, signals do what they
+would have done before the application took them over.
 
 =head1 METHODS
 
@@ -70,18 +108,30 @@ environment variable, which in turn defaults to 2048.
 
 If an attempt is made to queue a record when the queue is full, the older
 records will be removed from the queue until there is enough space for the
-newer ones. If this happens, the code will call L</report_dropped> with
-the C<buffer-full> reason and the number of records that were dropped.
+newer ones. The queue lives in the export child, so this is reported to
+L</report_dropped> with the C<buffer-full> reason and the number of
+records that were dropped as part of the next acknowledgement: a flush or
+shutdown that waits for one sees it, and while no command waits these
+counts stay unreported.
 
 =item C<schedule delay>
 
-The minimum delay in milliseconds between calls to
-L<OpenTelemetry::Exporter/export>. If not set, this will read the default
-value from the
+The delay in milliseconds between scheduled exports of a partially
+filled queue. If not set, this will read the default value from the
 L<"OTEL_BSP_SCHEDULE_DELAY"|OpenTelemetry::SDK/OTEL_BSP_SCHEDULE_DELAY>
-environment variable, which in turn defaults to 5000.
+environment variable, which in turn defaults to 5000. A negative value
+logs a warning and uses the default.
 
-Note: this is not yet implemented.
+The countdown starts when a record reaches an empty queue, and a new
+countdown starts at every export for the records it leaves behind. The
+countdown is kept by the export child, which exports the partially filled
+queue the moment it runs out, even when the emitting process stops
+sending records: no event loop in the emitting process is needed, and no
+L</force_flush> call is required to get idle records out.
+
+A partial queue is only exported on its own while the export child
+exists: the first record spawns it, and it leaves when the processor is
+shut down.
 
 =back
 
@@ -90,8 +140,23 @@ Note: this is not yet implemented.
     $processor->process( @records );
 
 Takes a list of records that are ready for processing. Once called, this
-method will queue them for eventual processing. Once enough records have
-been queued, a batch of them will be sent to the configured exporter.
+method hands them to the export child, which queues them there: a batch
+of L</batch_size> records goes out right away, and a partially filled
+queue goes out when the L</schedule delay> countdown runs out, in either
+case without this call waiting for the export.
+
+Records given to a processor that has been shut down are ignored: they
+are neither queued nor exported.
+
+The records are handed over without waiting for their export: the result
+of that export cannot be known at the time of the handover, so it is not
+reported through L</report_result>. Only the records this process waits
+for (during L</force_flush>) report their results. Records that cannot be
+handed over to the export child are not exported in this process either:
+that would block the caller for as long as a failing exporter takes to
+time out. They are reported to L</report_dropped> with the
+C<subprocess-failed> reason instead, and the next call spawns a fresh
+export child.
 
 Since this processor works only when a batch is ready, it can sometimes make
 for more complicated debugging. For a simpler processor that handles each
@@ -126,13 +191,21 @@ subclasses.
 
     $result = await $processor->force_flush( $timeout );
 
-Empties the internal queue by sending any unexported records to the exporter.
+Empties the queue held by the export child by sending any unexported
+records to the exporter.
 
-Takes an optional timeout in seconds. If this has been set, any records
-remaining after the time has run out will be dropped and the number of dropped
-spans will be reported with L</report_dropped> with the C<force-flush> reason.
+This operation is synchronous for the caller: it blocks until every
+queued batch has been exported and the export child (if one is running)
+has acknowledged the flush order. Takes an optional timeout in seconds.
+When the time runs out, this call returns a timeout result but does not
+stop the export child: it was told to drain to the end, so the records it
+did not finish with stay in its queue and go out with its next scheduled
+export. Late answers to an abandoned flush are recognised and discarded.
 
-This method will also call L<"force_flush"|OpenTelemetry::Exporter/force_flush>
+When an export fails, the flush keeps exporting the rest of the queue and
+returns the first failed result.
+
+This method will also call L"force_flush"|OpenTelemetry::Exporter/force_flush>
 on the configured exporter. It returns a L<Future> that will hold the result
 of that operation.
 
@@ -140,40 +213,45 @@ of that operation.
 
     $result = await $processor->shutdown( $timeout );
 
-Calls L<"shutdown"|OpenTelemetry::Exporter/shutdown> on the configured
-exporter and returns a L<Future> that will hold the result of that operation.
+The specification wants shutdown to include the effects of a
+L</force_flush>, so the order sent to the export child makes it export
+everything still in its queue, call
+L"force_flush"|OpenTelemetry::Exporter/force_flush> and then
+L"shutdown"|OpenTelemetry::Exporter/shutdown> on the configured exporter,
+and acknowledge with the result: the shutdown's own result if it failed,
+and otherwise the first failure of the drain or the flush it implies.
+This call waits for that acknowledgement within its optional timeout;
+when the wait runs out the export child is killed, and the records it
+still held are lost.
 
-Once the processor has been shutdown, any additional calls to L</shutdown>,
-L</force_flush> will do nothing and immediately return a success result.
+Once the processor has been shutdown, any additional calls to
+L</process>, L</shutdown>, or L</force_flush> do nothing: the records are
+not queued or exported, and the calls immediately return a success
+result.
 
 =head1 METRICS
 
-This processor generates the metrics described below as part of its operation.
-At the time of writing, these metrics are non-standard, but their inclusion
-in the standard
+Metrics are reported using L<Metrics::Any>. Please consult the documentation
+of that module to learn how to redirect where they are sent to. The
+signal-specific subclasses (such as
+L<OpenTelemetry::SDK::Trace::Span::Processor::Batch>) turn the reports
+below into counters. At the time of writing, these metrics are
+non-standard, but their inclusion in the standard
 L<is being discussed|https://github.com/open-telemetry/semantic-conventions/issues/83>.
 
-Metrics are reported using L<Metrics::Any>. Please consult the documentation
-of that module to learn how to redirect where they are sent to.
-
-=over
-
-=item C<otel.processor.batch.buffer_use>
-
-Set to the size of the internal queue divided by the L</max_queue_size>
-immediately before a batch is picked up for processing.
-
-=back
+The queue and the exports of this processor live in the export child,
+where a metrics registry of this process would not be able to see them.
+What the child learns (records dropped from a full buffer, and the
+results of drains waited for by L</force_flush>) reaches this process
+through acknowledgements and is reported from here through
+L</report_dropped> and L</report_result>, which subclasses turn into
+metrics.
 
 =head1 SEE ALSO
 
 =over
 
 =item L<Future>
-
-=item L<IO::Async::Function>
-
-=item L<IO::Async::Loop>.
 
 =item L<Metrics::Any>
 

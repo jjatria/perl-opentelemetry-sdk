@@ -12,6 +12,10 @@ class OpenTelemetry::SDK::Trace::Span::Processor::Batch
     use OpenTelemetry::Common ();
     use OpenTelemetry::Constants -export;
 
+    method procname :override {
+        return 'otel-batch-spans';
+    }
+
     my $logger = OpenTelemetry::Common::internal_logger;
 
     use Metrics::Any '$metrics', strict => 1,

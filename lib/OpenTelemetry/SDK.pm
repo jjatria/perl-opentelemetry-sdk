@@ -89,8 +89,14 @@ sub configure_propagators ($, @args) {
         = OpenTelemetry::Propagator::Composite->new(@propagators),
 }
 
+sub _ignore_sigpipe {
+    state $ignored = $SIG{PIPE} //= 'IGNORE';
+}
+
 sub configure_logger_provider ($, $provider = undef, @) {
     my $logger = OpenTelemetry::Common::internal_logger;
+
+    _ignore_sigpipe();
 
     state %map = (
         jaeger  => '::Jaeger',
@@ -160,6 +166,8 @@ sub configure_logger_provider ($, $provider = undef, @) {
 
 sub configure_tracer_provider ($, $provider = undef, @) {
     my $logger = OpenTelemetry::Common::internal_logger;
+
+    _ignore_sigpipe();
 
     state %map = (
         jaeger  => '::Jaeger',
