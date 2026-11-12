@@ -121,6 +121,10 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     field $ack_read;
     field $ack_seq = 0;
 
+    method procname {
+        return 'otel-batch-proc';
+    }
+
     ADJUST {
         die OpenTelemetry::X->create(
             Invalid => "Exporter must implement the OpenTelemetry::Exporter interface: " . ( ref $exporter || $exporter )
@@ -182,6 +186,8 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             # it was forked from runs against shared descriptors.
             local $SIG{PIPE}    = 'IGNORE';
             local $SIG{__DIE__} = 'DEFAULT';
+
+            $0 = $self->procname;
 
             $self->_export_child(
                 $sync_channel->( $cmd_child ),

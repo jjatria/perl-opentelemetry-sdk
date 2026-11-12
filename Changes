@@ -43,6 +43,8 @@ Revision history for OpenTelemetry-SDK
       specify it. Records dropped from a full queue are reported to
       report_dropped (reason buffer-full) through the next acknowledgement
       instead.
+    * The batch processor subprocesses are named otel-batch-(logs|spans) so
+      they can be easily identified.
 
 0.101     2026-10-30 00:04:09 GMT
 
