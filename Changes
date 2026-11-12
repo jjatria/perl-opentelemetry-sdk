@@ -22,6 +22,8 @@ Revision history for OpenTelemetry-SDK
     * The export subprocess now closes every descriptor it inherited at
       the fork except standard input and output and the channels it runs
       on.
+    * It also no longer runs signal handlers installed by the emitting
+      process.
     * The batch processor's queue moved into the export subprocess, which
       runs a schedule of its own and honours OTEL_BSP_SCHEDULE_DELAY (5000
       milliseconds by default; a negative value logs a warning and uses the

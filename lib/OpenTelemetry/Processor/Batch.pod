@@ -57,7 +57,11 @@ whose copy the export child kept alive would have stayed open after the
 serving process closed its own, leaving a client talking to a live
 connection that no process will ever read again. A fork that leaves such
 descriptors behind tends to hang clients rather than crash them, which
-is why the subprocess sweeps them at the start.
+is why the subprocess sweeps them at the start. Signal handlers are
+dropped the same way: a handler that dies (a request timeout one, most
+likely) would otherwise run inside the subprocess on the next signal,
+done against the wrong process's state. Without it, signals do what they
+would have done before the application took them over.
 
 =head1 METHODS
 
