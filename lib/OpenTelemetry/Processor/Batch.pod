@@ -49,6 +49,16 @@ so a forked process also exports in the background rather than blocking
 on the export. The locks used internally are recreated in the child
 transparently, see L<OpenTelemetry::SDK::Lock>.
 
+The export child itself is forked from the middle of whatever the
+emitting process was doing, so it closes every descriptor it inherited
+except standard input and output and the channels it runs on. Anything
+else belonged to the emitting process: an accepted client connection
+whose copy the export child kept alive would have stayed open after the
+serving process closed its own, leaving a client talking to a live
+connection that no process will ever read again. A fork that leaves such
+descriptors behind tends to hang clients rather than crash them, which
+is why the subprocess sweeps them at the start.
+
 =head1 METHODS
 
 This class implements the L<OpenTelemetry::Processor> role. Please consult
