@@ -25,8 +25,8 @@ my $processor = OpenTelemetry::Processor::Batch->new(
     exporter   => $exporter,
 );
 
-# Leave some records pending in the parent, without ever triggering an
-# export there (and therefore without spawning an export child there).
+# Leave some records pending in the parent's export child, below its
+# batch size (and therefore not exported there yet).
 $processor->process({ parent => $_ }) for 1 .. 2;
 
 my $child = fork;
@@ -54,7 +54,8 @@ waitpid $child, 0;
 is $?, 0, 'the forked child used the processor without wedging';
 
 # The child exported its batch and nothing else: the records the
-# parent had queued are still pending there, and must not be sent twice.
+# parent had sent to its own export child are still pending there, and
+# must not be sent twice.
 is $exporter->calls, [
     [ 'export', [ { child => 1 }, { child => 2 }, { child => 3 } ], 30_000 ],
     [ 'force_flush' ],
@@ -62,7 +63,7 @@ is $exporter->calls, [
 
 $exporter->reset;
 
-# The parent's queue survived the child's adoption untouched, and its
+# The parent's records survived the child's adoption untouched, and its
 # export path still works after the child is gone.
 is $processor->force_flush->get, TRACE_EXPORT_SUCCESS,
     'the parent can still flush its own queue';
