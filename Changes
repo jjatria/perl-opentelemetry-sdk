@@ -19,6 +19,9 @@ Revision history for OpenTelemetry-SDK
       exporter's connection mid-request reports a failed export instead of
       terminating the process.
       See OpenTelemetry::Processor::Batch/FORKED PROCESSES for details.
+    * The export subprocess now closes every descriptor it inherited at
+      the fork except standard input and output and the channels it runs
+      on.
     * The batch processor's queue moved into the export subprocess, which
       runs a schedule of its own and honours OTEL_BSP_SCHEDULE_DELAY (5000
       milliseconds by default; a negative value logs a warning and uses the

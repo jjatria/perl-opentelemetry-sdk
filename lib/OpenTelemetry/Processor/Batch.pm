@@ -25,7 +25,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     use OpenTelemetry::SDK::Lock;
     use OpenTelemetry::X;
     use OpenTelemetry;
-    use POSIX qw( _exit WNOHANG );
+    use POSIX qw( _exit sysconf _SC_OPEN_MAX WNOHANG );
     use Scalar::Util 'blessed';
     use Socket qw( AF_UNIX SOCK_STREAM );
     use Time::HiRes qw( CLOCK_MONOTONIC clock_gettime sleep );
@@ -65,6 +65,58 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         $channel->setup_sync_mode( $handle );
         binmode $handle, ':unix';
         return $channel;
+    };
+
+    # Closes every descriptor this process holds other than stdio and
+    # the channels it was given. The export subprocess is forked from the
+    # middle of a request: it inherits a copy of every descriptor the
+    # serving process has open, an accepted client connection among
+    # them. A copy held here keeps such a socket half-open after its real
+    # owner closes its own: the client then keeps talking to a connection
+    # that no worker will ever read from again, and hangs waiting for an
+    # answer. POSIX::close rather than a layer handle close is deliberate:
+    # no userspace output buffer inherited from the parent gets flushed by
+    # this process on the way, and no Perl handle object is disowned, so
+    # nothing can close a descriptor number the kernel has since handed
+    # out again.
+    my $close_other_fds = sub ( @keep ) {
+        my %keep = map { ( $_ => 1 ) } grep { defined } @keep;
+
+        # Enumerate the open descriptors where the system exposes them
+        # per process: procfs on Linux, Solaris and friends, the fdesc
+        # view on /dev/fd on macOS (and FreeBSD when it is mounted). A
+        # listing that does not contain one of the channels this process
+        # demonstrably has open is not its own view, and is not trusted.
+        my ( @fds, $listed );
+        for my $path ( '/proc/self/fd', '/dev/fd' ) {
+            opendir my $dir, $path or next;
+            my @seen = map { 0 + $_ } grep { /^\d+\z/ } readdir $dir;
+            closedir $dir;
+            next unless grep { exists $keep{ $_ } } @seen;
+            @fds = grep { !$keep{$_} } @seen;
+            $listed++;
+            last;
+        }
+
+        if ( !$listed ) {
+            # No per-process listing exists: probe the descriptor range,
+            # one failed syscall each. POSIX offers no way to enumerate
+            # open descriptors, so this is what portability means here;
+            # bounded at a generous guess when the system reports no
+            # limit (systems without procfs or fdesc report sysconf
+            # against the real descriptor limit, which practically never
+            # exceeds this bound).
+            my $max = sysconf( _SC_OPEN_MAX );
+            $max = 1_024 if !defined $max || $max < 2;
+            $max = 65_536 if $max > 65_536;
+            @fds = grep { !$keep{$_} } 3 .. $max;
+        }
+
+        # A descriptor can vanish between the enumeration and the close
+        # (the opendir above is its own entry); failures are not errors.
+        for my $fd (@fds) { POSIX::close( $fd ) };
+
+        return;
     };
 
     # Calls one of the exporter's methods and reduces its result to a
@@ -179,6 +231,11 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         if ( $pid == 0 ) {
             close $cmd_parent;
             close $ack_parent;
+
+            # Let go of everything else inherited from the request this
+            # fork happened in, the client connection most of all; see
+            # $close_other_fds.
+            $close_other_fds->( fileno $cmd_child, fileno $ack_child );
 
             # The child must not die on a broken pipe while answering,
             # and must not run any inherited __DIE__ handler; it leaves
