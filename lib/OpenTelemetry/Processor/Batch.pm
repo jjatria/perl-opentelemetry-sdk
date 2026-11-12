@@ -32,27 +32,38 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     my $logger = OpenTelemetry::Common::internal_logger;
 
-    use Metrics::Any '$metrics', strict => 1,
-        name_prefix => [qw( otel processor batch )];
-
-    $metrics->make_gauge( 'buffer_use',
-        name        => [qw( buffer use )],
-        description => 'Ratio between maximum queue size and the size of the queue at export time',
-    );
-
-    # Commands to the export subprocess travel over one
-    # IO::Async::Channel, as [ $type, $args, $want_ack ] array
-    # references; every command that asks for one is answered on a
-    # second channel with the export result as a scalar reference. Both
-    # ends of both channels run in the channel's synchronous mode:
-    # blocking send and recv over a socketpair, with no event loop
-    # anywhere. The Storable codec is chosen explicitly so the framing
-    # does not depend on which optional serialisers are installed; it
-    # round-trips the Object::Pad based record and span classes.
+    # Records, and everything that goes with them, are handed to the
+    # export subprocess, which owns the queue, the batch boundaries, and
+    # the schedule. Commands travel over one IO::Async::Channel as
+    # [ $type, $args, $want_ack, $id ] array references: DATA carries
+    # records to queue, FLUSH and SHUTDOWN ask the subprocess to drain
+    # the queue and call the exporter's flush (and, for SHUTDOWN,
+    # shutdown) before acknowledging on a second channel with a hash
+    # reference { id, result, exported, dropped }. Every command this
+    # class sends that asks for an answer is sent and read under the
+    # same lock, so at most one acknowledgement is awaited at a time and
+    # late answers of abandoned flushes are recognised by their id.
+    # Both ends of both channels run in the channel's synchronous mode:
+    # blocking send and recv over a socketpair. The selector timeouts in
+    # the subprocess and in _read_ack are what this class has instead of
+    # an event loop. The exporter interface is synchronous, so no loop
+    # could drive it anyway. The Storable codec is chosen explicitly so
+    # the framing does not depend on which optional serialisers are
+    # installed. Tt round-trips the Object::Pad based record and span
+    # objects.
+    #
+    # The :unix layer is essential, not cosmetic: synchronous-mode
+    # channels read with the buffered read(), which can pull the next
+    # frame's bytes into the handle's userspace buffer. A select() on
+    # the descriptor cannot see those bytes, so a selector loop would
+    # wait on an apparently idle socket while a whole waiting frame sits
+    # unread in that buffer. An unbuffered layer keeps read() and
+    # select() looking at the same bytes.
     my $sync_channel = sub ( $handle ) {
         $handle->blocking( 1 );
         my $channel = IO::Async::Channel->new( codec => 'Storable' );
         $channel->setup_sync_mode( $handle );
+        binmode $handle, ':unix';
         return $channel;
     };
 
@@ -96,17 +107,19 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     field $lock = OpenTelemetry::SDK::Lock->new;
 
     field $done :reader;
-    field @queue;
     field $created_pid = $$;
 
     # State of the export subprocess, spawned lazily (see
     # _ensure_export_child): its pid, the command channel, and the
     # acknowledgement channel with the raw read handle beside it for
-    # the deadline selector in _read_ack to watch.
+    # the deadline selector in _read_ack to watch. The id sent with
+    # every acknowledgement comes from $ack_seq, so answers that arrive
+    # after their reader gave up can be recognised and discarded.
     field $child_pid;
     field $cmd_channel;
     field $ack_channel;
     field $ack_read;
+    field $ack_seq = 0;
 
     ADJUST {
         die OpenTelemetry::X->create(
@@ -123,13 +136,24 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             );
             $batch_size = $max_queue_size;
         }
+
+        if ( $schedule_delay < 0 ) {
+            $logger->warn(
+                'Schedule delay cannot be negative when instantiating batch processor',
+                {
+                    schedule_delay => $schedule_delay,
+                },
+            );
+            $schedule_delay = 5_000;
+        }
     }
 
     # Spawns the export subprocess unless one is already running. The
-    # subprocess is a plain fork of this process that serves the commands
-    # arriving on its pipe; it does not run an event loop, and the
-    # exporter is used through the copy of this process's own state, so
-    # no exporter object ever travels through the pipe.
+    # subprocess is a plain fork of this process: it owns the queue of
+    # records this process has sent it, exports full batches and due
+    # partial ones on its own, and uses the exporter through the copy of
+    # this process's own state, so no exporter object ever travels
+    # through the pipe.
     #
     # Must be called while holding $lock, as part of the same critical
     # section as the _transact that follows: another thread must not be
@@ -161,6 +185,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
             $self->_export_child(
                 $sync_channel->( $cmd_child ),
+                $cmd_child,
                 $sync_channel->( $ack_child ),
             );
             _exit 0;
@@ -177,23 +202,25 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         return;
     }
 
-    method _send_command ( $type, $args, $want_ack ) {
+    method _send_command ( $type, $args, $want_ack, $id ) {
         # The synchronous channel writes with plain blocking sends, so a
         # subprocess that has already died would raise a fatal SIGPIPE
         # here. Ignored locally, the write fails with EPIPE instead and
         # dies below, into the caller's failure handling.
         local $SIG{PIPE} = 'IGNORE';
 
-        $cmd_channel->send([ $type, $args, $want_ack ])
+        $cmd_channel->send([ $type, $args, $want_ack, $id ])
             or die "cannot write to the export child: $!\n";
         return;
     }
 
-    # Reads one acknowledgement value, blocking until it arrives or
-    # $timeout (in seconds) runs out. Returns ('ok', $result) or
-    # ('timeout'); the caller kills the child in the latter case, as it
-    # cannot know what the child is still busy with.
-    method _read_ack ( $timeout = undef ) {
+    # Reads acknowledgements until one with $wanted_id arrives, blocking
+    # until then or until $timeout (in seconds) runs out. Answers of
+    # flushes this process already gave up on still carry drop reports
+    # worth applying, and are discarded afterwards. Returns
+    # ('ok', $frame) or ('timeout'); the caller decides what to do with
+    # a subprocess that did not answer in time.
+    method _read_ack ( $wanted_id, $timeout = undef ) {
         my $deadline =
             defined $timeout ? clock_gettime(CLOCK_MONOTONIC) + $timeout : undef;
 
@@ -216,39 +243,133 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             # An acknowledgement is a single small write, so once the
             # selector has reported the channel readable, the whole
             # frame is there and recv will not block again.
-            my $result = $ack_channel->recv;
+            my $frame = $ack_channel->recv;
             die "the export child closed the connection\n"
-                unless defined $result;
+                unless defined $frame;
 
-            return 'ok', $$result;
+            if ( ref $frame eq 'HASH' && ( my $dropped = $frame->{dropped} ) ) {
+                $self->report_dropped( $_, $dropped->{$_} )
+                    for keys $dropped->%*;
+            }
+
+            next if ref $frame ne 'HASH' || $frame->{id} != $wanted_id;
+
+            return 'ok', $frame;
         }
     }
 
     # One round of the command protocol with the export subprocess:
-    # sends the command and, when an answer was requested, waits for
-    # the acknowledgement. Returns ('ok', $result) or ('timeout') when
-    # $want_ack is true, waiting $ack_timeout seconds (unlimited when
-    # it is not given), and nothing otherwise: that handover is
-    # fire-and-forget and can only fail by dying here. Must be called
-    # while holding $lock, so the send and the acknowledgement read
-    # cannot interleave with another thread's.
-    method _transact ( $type, $args, $want_ack = 0, $ack_timeout = undef ) {
-        $self->_send_command( $type, $args, $want_ack );
+    # sends the command and, when an answer was requested, waits for the
+    # acknowledgement with that id. Returns ('ok', $frame) or
+    # ('timeout') when $want_ack is true, waiting $ack_timeout seconds
+    # (unlimited when it is not given), and nothing otherwise: that
+    # handover is fire-and-forget and can only fail by dying here. Must
+    # be called while holding $lock, so the send and the acknowledgement
+    # read cannot interleave with another thread's.
+    method _transact ( $type, $args, $want_ack = 0, $id = 0, $ack_timeout = undef ) {
+        $self->_send_command( $type, $args, $want_ack, $id );
 
-        return $self->_read_ack( $ack_timeout )
+        return $self->_read_ack( $id, $ack_timeout )
             if $want_ack;
         return;
     }
 
-    # The body of the export subprocess: serves commands until the
-    # command channel ends, then leaves. It never dies and never returns
-    # normally except when the command asked for shutdown. A recv that
+    # The body of the export subprocess: the queue lives here, together
+    # with the countdown to the next scheduled export. The loop selects
+    # on the command channel with that countdown as its timeout, which
+    # is what lets it export a partial batch on time even while this
+    # process's creator sends it nothing. It never dies and never
+    # returns normally except after answering SHUTDOWN. A recv that
     # fails for any reason (undecodable frame, read error) ends the loop
     # just like EOF does: the stream can no longer be trusted, and the
-    # parent treats the acknowledgement that never arrives as a dead
+    # parent treats an acknowledgement that never arrives as a dead
     # child.
-    method _export_child ( $cmd, $ack ) {
+    method _export_child ( $cmd, $cmd_handle, $ack ) {
+        my @queue;
+        my $next_export;
+
+        # Drop counts collected here reach the parent's reports with the
+        # next acknowledgement; while no command asks for one there is no
+        # way back, and these counts stay unreported.
+        my %dropped;
+
+        # Exports at most one batch, taking it from the front of the
+        # queue; $timeout is the argument list for the exporter's export
+        # method.
+        my $export_batch = sub ( $timeout ) {
+            return EXPORT_RESULT_SUCCESS
+                unless @queue;
+
+            my $now    = clock_gettime(CLOCK_MONOTONIC);
+            my $batch  = [ splice @queue, 0, $batch_size ];
+            my $result = $sync_call->(
+                sub { $exporter->export( $batch, $timeout->@* ) } );
+
+            # Records left behind wait for a full batch or for a new
+            # countdown, which starts from this export.
+            if ( @queue ) {
+                $next_export = $now + $schedule_delay / 1000;
+            }
+            else {
+                undef $next_export;
+            }
+
+            return $result;
+        };
+
+        # Empties the queue the way FLUSH and SHUTDOWN ask: every batch
+        # goes out, the timeout carried by the command only bounds the
+        # calls to the exporter. Returns ( first failure, count ).
+        my $drain = sub ( $budget ) {
+            my $deadline = defined $budget
+                ? clock_gettime(CLOCK_MONOTONIC) + $budget
+                : undef;
+
+            my ( $failed, $exported );
+            while ( @queue ) {
+                my $remaining;
+                if ( defined $deadline ) {
+                    $remaining = $deadline - clock_gettime(CLOCK_MONOTONIC);
+                    $remaining = 0 if $remaining < 0;
+                }
+
+                $exported += $batch_size < @queue ? $batch_size : @queue;
+                my $result = $export_batch->(
+                    defined $remaining ? [ $remaining ] : [undef] );
+                $failed //= $result
+                    if $result != EXPORT_RESULT_SUCCESS;
+            }
+
+            return ( $failed, $exported // 0, $deadline );
+        };
+
         while (1) {
+            # The countdown is due: the partial batch goes out before
+            # anything else is considered.
+            if ( defined $next_export ) {
+                my $remaining = $next_export - clock_gettime(CLOCK_MONOTONIC);
+                if ( $remaining <= 0 ) {
+                    $export_batch->( [ $exporter_timeout ] );
+                    next;
+                }
+            }
+
+            my $bits = '';
+            vec( $bits, fileno $cmd_handle, 1 ) = 1;
+
+            my $ready = select my $rin = $bits, undef, undef,
+                defined $next_export
+                    ? $next_export - clock_gettime(CLOCK_MONOTONIC)
+                    : undef;
+
+            if ( !defined $ready ) {
+                redo if $! == EINTR;
+                last;    # the selector failed for good
+            }
+
+            next
+                unless $ready;
+
             my $command;
             try {
                 $command = $cmd->recv;
@@ -260,25 +381,84 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             last
                 unless defined $command;
 
-            my ( $type, $args, $want_ack ) =
+            my ( $type, $args, $want_ack, $id ) =
                 ref $command eq 'ARRAY' ? $command->@* : ();
 
-            my $result = EXPORT_RESULT_FAILURE;
+            my $result   = EXPORT_RESULT_FAILURE;
+            my $exported = 0;
 
             if ( $type ) {
                 if ( $type eq 'DATA' ) {
-                    $result = $sync_call->( sub { $exporter->export( $args->@* ) } );
+                    push @queue, $args->@*;
+
+                    # If the buffer is full, the oldest records go: the
+                    # queue is always FIFO, even for dropped records.
+                    # This behaviour is not in the spec, but is
+                    # consistent with the Ruby implementation.
+                    if ( my $overflow = @queue - $max_queue_size ) {
+                        splice @queue, 0, $overflow;
+                        $dropped{'buffer-full'} += $overflow;
+                    }
+
+                    # The first record to reach an empty queue starts
+                    # the countdown to the next scheduled export.
+                    $next_export //= clock_gettime(CLOCK_MONOTONIC)
+                        + $schedule_delay / 1000;
+
+                    $export_batch->( [ $exporter_timeout ] )
+                        while @queue >= $batch_size;
                 }
-                elsif ( $type eq 'FLUSH' ) {
-                    $result = $sync_call->( sub { $exporter->force_flush( $args->@* ) } );
-                }
-                elsif ( $type eq 'SHUTDOWN' ) {
-                    $result = $sync_call->( sub { $exporter->shutdown( $args->@* ) } );
+                elsif ( $type eq 'FLUSH' || $type eq 'SHUTDOWN' ) {
+                    my ( $budget ) = $args->@*;
+
+                    my ( $failed, $count, $deadline ) = $drain->( $budget );
+                    $exported = $count;
+
+                    my $remaining;
+                    if ( defined $deadline ) {
+                        $remaining = $deadline - clock_gettime(CLOCK_MONOTONIC);
+                        $remaining = 0 if $remaining < 0;
+                    }
+
+                    my $flushed = $sync_call->(
+                        sub {
+                            $exporter->force_flush(
+                                defined $remaining ? ( $remaining ) : ()
+                            );
+                        }
+                    );
+                    $failed //= $flushed
+                        if $flushed != EXPORT_RESULT_SUCCESS;
+
+                    $result = $failed // $flushed;
+
+                    if ( $type eq 'SHUTDOWN' ) {
+                        my $down = $sync_call->(
+                            sub {
+                                $exporter->shutdown(
+                                    defined $remaining ? ( $remaining ) : ()
+                                );
+                            }
+                        );
+
+                        # A shutdown that itself failed is reported as
+                        # such; when it went through, any failure of the
+                        # flush it implies is what gets reported.
+                        $result = $down
+                            if $down != EXPORT_RESULT_SUCCESS;
+                    }
                 }
             }
 
             if ( $want_ack ) {
-                $ack->send( \$result ) or _exit 0;    # nobody left
+                $ack->send({
+                    id       => $id,
+                    result   => $result,
+                    exported => $exported,
+                    dropped  => { %dropped },
+                }) or _exit 0;    # nobody left
+
+                %dropped = ();
             }
 
             last
@@ -289,15 +469,16 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     # A processor inherited across a fork() can reuse none of the state
-    # the parent set up: the export subprocess belongs to the parent (and
-    # driving its channels from here would steal the parent's commands
-    # and acknowledgements). Closing the inherited channels releases
-    # only this process's copy of those descriptors, which the parent
-    # still holds its own of; the subprocess itself is never waited for
-    # nor signalled from here, since it is not this process's child.
+    # the parent set up: the export subprocess belongs to the parent (it
+    # holds the records the parent sent, and driving its channels from
+    # here would steal the parent's commands and acknowledgements).
+    # Closing the inherited channels releases only this process's copy
+    # of those descriptors, which the parent still holds its own of; the
+    # subprocess itself is never waited for nor signalled from here,
+    # since it is not this process's child.
     #
     # This process spawns an export subprocess of its own as soon as it
-    # has a batch to send (see _ensure_export_child).
+    # receives a record (see _ensure_export_child).
     method _adopt_into_forked_process {
         return
             if $$ == $created_pid;
@@ -310,10 +491,6 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         undef $ack_channel;
         undef $ack_read;
         undef $child_pid;
-
-        # Anything already queued belongs to the parent's pending export
-        # the parent has its own copy of every record, reinitialize ours
-        @queue = ();
 
         $created_pid = $$;
 
@@ -337,7 +514,11 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                 waitpid $child_pid, 0;
                 last;
             }
-            sleep 0.005;
+
+            # A signal handler inherited from a test harness or the
+            # application could make the sleep die; the loop just keeps
+            # turning until the deadline.
+            try { sleep 0.005 } catch ($e) { }
         }
 
         $ack_channel->close if $ack_channel;
@@ -349,8 +530,8 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     }
 
     # Abandons the subprocess immediately: used when its command channel
-    # can no longer be trusted (a half-written frame, or an answer that
-    # never arrived).
+    # can no longer be trusted (a half-written frame, an answer that
+    # never arrived, or a shutdown that cannot wait for the drain).
     method _kill_child {
         return unless defined $child_pid;
 
@@ -367,62 +548,61 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         return;
     }
 
+    # Hands the records to the export subprocess and keeps going. The
+    # subprocess queues them there, and its own loop takes them out: a
+    # full batch right away, a partial one when the schedule delay runs
+    # out, whether or not this process keeps using the processor.
+    #
+    # A handover that fails (the subprocess having died since the last
+    # call) is retried once on a freshly spawned subprocess: replacing
+    # the subprocess is cheap, these records were never delivered, and
+    # exporting them here is not an option (a failing exporter would
+    # block this caller for as long as it takes to time out). Only when
+    # the retry fails too are the records reported as dropped.
     method process ( @items ) {
         try {
+            # The spec asks a processor to ignore the records it gets
+            # after it has been shut down.
+            return
+                if $done;
+
+            return
+                unless @items;
+
             $self->_adopt_into_forked_process;
 
-            my $batch = $lock->enter(
-                sub {
-                    my $overflow = @queue + @items - $max_queue_size;
-                    if ( $overflow > 0 ) {
-                        # If the buffer is full, we drop old spans first
-                        # The queue is always FIFO, even for dropped spans
-                        # This behaviour is not in the spec, but is
-                        # consistent with the Ruby implementation.
-                        # For context, the Go implementation instead
-                        # blocks until there is room in the buffer.
-                        splice @queue, 0, $overflow;
-                        $self->report_dropped( 'buffer-full', $overflow );
-                    }
+            my $count = @items;
 
-                    push @queue, @items;
-
-                    return [] if @queue < $batch_size;
-
-                    $metrics->set_gauge_to(
-                        buffer_use => @queue / $max_queue_size
-                    ) if @queue;
-
-                    [ splice @queue, 0, $batch_size ];
-                }
-            );
-
-            return unless @$batch;
-
-            my $count = scalar @$batch;
-
-            # Hand the batch to the export subprocess and keep going:
-            # this is a fire-and-forget send, its result is not waited
-            # for (and cannot be reported later without an event loop to
-            # watch the acknowledgement pipe).
-            try {
+            my $handover = sub {
                 $lock->enter(
                     sub {
                         $self->_ensure_export_child;
-                        $self->_transact( 'DATA', [ $batch, $exporter_timeout ] );
+                        $self->_transact( 'DATA', \@items );
                     }
                 );
+                return;
+            };
+
+            # This is a fire-and-forget send: the result of the eventual
+            # export is not waited for (and, for a scheduled export,
+            # there is no caller here to report it to).
+            try {
+                $handover->();
             }
             catch ($e) {
-                # The subprocess path is unavailable. Most likely the
-                # exporter's destination is down or unreachable, and
-                # exporting the batch here would block this process for
-                # as long as a failing export takes to time out; losing
-                # this batch is better than that. Discard the subprocess
-                # state so the next batch spawns a fresh one, and report
-                # the batch as dropped.
                 $self->_kill_child;
-                $self->report_dropped( 'subprocess-failed', $count );
+
+                try {
+                    $handover->();
+                }
+                catch ($e) {
+                    # The subprocess path is unavailable twice over.
+                    # Discard the subprocess state so the next call
+                    # spawns a fresh one, and report the records as
+                    # dropped.
+                    $self->_kill_child;
+                    $self->report_dropped( 'subprocess-failed', $count );
+                };
             }
 
             return;
@@ -436,6 +616,14 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     method report_result ( $result, $count ) { $result }
 
+    # The result of the flush implied by the specification's shutdown.
+    # With a subprocess running, the drain and the exporter calls it
+    # involves all happen there (it is the process holding the records
+    # and the exporter's live state); this process just hands over the
+    # order and waits. A SHUTDOWN that cannot be waited for (the flush
+    # of the shutdown timed out, or the subprocess stopped answering)
+    # means the subprocess is killed and the records it still held are
+    # lost.
     async method shutdown ( $timeout = undef ) {
         return EXPORT_RESULT_SUCCESS if $done;
 
@@ -443,43 +631,50 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
         my $start = timeout_timestamp;
 
-        # TODO: The Ruby implementation ignores whether the force_flush
-        # times out. Is this correct?
-        await $self->force_flush( maybe_timeout $timeout, $start );
-
-        $self->report_dropped( 'terminating', scalar @queue ) if @queue;
-        @queue = ();
-
-        my $remaining = maybe_timeout $timeout, $start;
-
-        # With an export subprocess running, the exporter's shutdown runs
-        # there (it is the process holding the exporter's live state);
-        # this process just hands over the order and reaps the child.
-        # A budget already spent by the flush still gets the exporter's
-        # own timeout for the shutdown step.
         if ( defined $child_pid ) {
-            my @shutdown_args = defined $remaining ? ( $remaining ) : ();
+            my @shutdown_args = ( maybe_timeout $timeout, $start );
             my $ack_wait =
-                defined $remaining && $remaining > 0
-                    ? $remaining
+                @shutdown_args && $shutdown_args[0] > 0
+                    ? $shutdown_args[0]
                     : $exporter_timeout / 1000;
 
-            my ( $state, $ack );
+            my $id = ++$ack_seq;
+            my ( $state, $frame );
             try {
-                ( $state, $ack ) = $lock->enter(
-                    sub { $self->_transact( 'SHUTDOWN', \@shutdown_args, 1, $ack_wait ) }
+                ( $state, $frame ) = $lock->enter(
+                    sub {
+                        $self->_transact( 'SHUTDOWN', \@shutdown_args, 1, $id, $ack_wait );
+                    }
                 );
             }
             catch ($e) { $state = 'died' }
 
             $self->_reap_child( $ack_wait );
 
-            return $state eq 'ok' ? $ack : EXPORT_RESULT_FAILURE;
+            my $result =
+                  $state eq 'ok'      ? $frame->{result}
+                : $state eq 'timeout' ? EXPORT_RESULT_TIMEOUT
+                :                       EXPORT_RESULT_FAILURE;
+
+            return $result;
         }
 
-        await $exporter->shutdown( maybe_timeout $timeout, $start );
+        my $flush = await $self->force_flush( maybe_timeout $timeout, $start );
+
+        my $result = await $exporter->shutdown( maybe_timeout $timeout, $start );
+
+        return $result
+            unless !defined $result || $result == EXPORT_RESULT_SUCCESS;
+        return $flush;
     }
 
+    # Orders the export subprocess to drain its queue and flush the
+    # exporter, waiting for it to acknowledge within $timeout (in
+    # seconds). The subprocess was told to drain to the end, so when
+    # this wait times out the subprocess is left running: the records it
+    # did not finish with stay in its queue and go out with its next
+    # scheduled export. A subprocess that died in the attempt is
+    # replaced when the next record arrives.
     async method force_flush ( $timeout = undef ) {
         return EXPORT_RESULT_SUCCESS if $done;
 
@@ -487,89 +682,38 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
         my $start = timeout_timestamp;
 
-        my @stack = $lock->enter( sub { splice @queue, 0, @queue } );
-
-        defer {
-            # If we still have any spans left it has to be because we
-            # timed out and couldn't export them. In that case, we drop
-            # them and report
-            $self->report_dropped( 'force-flush', scalar @stack ) if @stack;
+        unless ( defined $child_pid ) {
+            return await $exporter->force_flush( maybe_timeout $timeout, $start );
         }
 
-        # Flushing is synchronous by definition, so waiting for each
-        # batch's acknowledgement here (rather than driving it from an
-        # event loop) is exactly what the caller asked for.
-        while ( @stack ) {
-            my $remaining = maybe_timeout $timeout, $start;
-            return EXPORT_RESULT_TIMEOUT if $timeout and !$remaining;
+        my @flush_args = ( maybe_timeout $timeout, $start );
+        my $ack_wait =
+            @flush_args && $flush_args[0] > 0
+                ? $flush_args[0]
+                : $exporter_timeout / 1000;
 
-            my $batch = [ splice @stack, 0, $batch_size ];
+        my $id = ++$ack_seq;
+        my ( $state, $frame );
+        try {
+            ( $state, $frame ) = $lock->enter(
+                sub {
+                    $self->_ensure_export_child;
+                    $self->_transact( 'FLUSH', \@flush_args, 1, $id, $ack_wait );
+                }
+            );
+        }
+        catch ($e) { $state = 'died' }
 
-            my $count = scalar @$batch;
-
-            my ( $state, $result );
-            try {
-                ( $state, $result ) = $lock->enter(
-                    sub {
-                        $self->_ensure_export_child;
-                        $self->_transact( 'DATA', [ $batch, $remaining ], 1, $remaining );
-                    }
-                );
-            }
-            catch ($e) { $state = 'died' }
-
-            if ( $state eq 'timeout' ) {
-                $self->_kill_child;
-                return $self->report_result( EXPORT_RESULT_TIMEOUT, $count );
-            }
-
-            if ( $state eq 'died' ) {
-                # The subprocess cannot be trusted (or could not be
-                # started). Exporting this batch here would block the
-                # flushing caller on a failing exporter, so the batch is
-                # reported as a failed export instead, which stops the
-                # flush; the next use spawns a fresh subprocess.
-                $self->_kill_child;
-                $result = EXPORT_RESULT_FAILURE;
-            }
-
-            $self->report_result( $result, $count );
-
-            return $result unless $result == EXPORT_RESULT_SUCCESS;
+        if ( $state eq 'timeout' ) {
+            return $self->report_result( EXPORT_RESULT_TIMEOUT, 0 );
         }
 
-        my $remaining = maybe_timeout $timeout, $start;
-
-        # Timeout arguments are only passed when there is one: a spent or
-        # absent budget reaches the exporter as no argument at all, the
-        # way the direct calls always did.
-        if ( defined $child_pid ) {
-            my @flush_args = defined $remaining ? ( $remaining ) : ();
-            my $ack_wait =
-                defined $remaining && $remaining > 0
-                    ? $remaining
-                    : $exporter_timeout / 1000;
-
-            my ( $state, $result );
-            try {
-                ( $state, $result ) = $lock->enter(
-                    sub { $self->_transact( 'FLUSH', \@flush_args, 1, $ack_wait ) }
-                );
-            }
-            catch ($e) { $state = 'died' }
-
-            return $result if $state eq 'ok';
-
-            if ( $state eq 'timeout' ) {
-                $self->_kill_child;
-                return EXPORT_RESULT_TIMEOUT;
-            }
-
+        if ( $state eq 'died' ) {
             $self->_kill_child;
-            return EXPORT_RESULT_FAILURE;
+            return $self->report_result( EXPORT_RESULT_FAILURE, 0 );
         }
 
-        await $exporter->force_flush( maybe_timeout $timeout, $start );
+        return $self->report_result( $frame->{result}, $frame->{exported} );
     }
 
     method DESTROY {
@@ -590,13 +734,14 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         return unless defined $child_pid;
 
         my $timeout = ( $exporter_timeout // 30_000 ) / 1000;
+        my $id      = ++$ack_seq;
 
         my $state;
         try {
             $lock->enter(
                 sub {
                     ( $state ) =
-                        $self->_transact( 'SHUTDOWN', [ $timeout ], 1, $timeout );
+                        $self->_transact( 'SHUTDOWN', [ $timeout ], 1, $id, $timeout );
                 }
             );
         }
@@ -607,3 +752,5 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
         return;
     }
 }
+
+1;

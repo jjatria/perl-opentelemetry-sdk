@@ -8,22 +8,41 @@ Revision history for OpenTelemetry-SDK
     * The SDK is now fork-safe and the batch processor no longer requires an
       event loop to run.
       This mainly affects the OTLP exporter because it uses the batch processor
-      by default. It now exports through a subprocess of its own, spawned
-      lazily when the first batch is ready, instead of running an
-      IO::Async::Function on an event loop, so processes that don't run
-      one are no longer blocked by the export step.
+      by default. It now exports through a subprocess of its own, spawned on
+      the first record, instead of running in an event loop, so processes that
+      don't run one are no longer blocked by the export step.
       Locks are now OpenTelemetry::SDK::Lock objects that rebuild themselves
       transparently in a forked process, so providers inherited across a
-      fork keep working without any child-initialisation step, and a forked
-      process drops the queue it inherited (those records belong to the
-      parent's pending export) and spawns an export subprocess of its own.
-      A batch that cannot be handed to the export subprocess is reported as
-      dropped (reason subprocess-failed).
+      fork keep working without any child-initialisation step.
       The configure functions now set $SIG{PIPE} to IGNORE (unless the
       application installed its own handler), so a collector closing an
       exporter's connection mid-request reports a failed export instead of
       terminating the process.
       See OpenTelemetry::Processor::Batch/FORKED PROCESSES for details.
+    * The batch processor's queue moved into the export subprocess, which
+      runs a schedule of its own and honours OTEL_BSP_SCHEDULE_DELAY (5000
+      milliseconds by default; a negative value logs a warning and uses the
+      default): a full batch is exported as soon as it is complete, and a
+      partially filled queue when the countdown runs out, so a process that
+      goes idle no longer needs to flush or shut down the processor to get
+      its records out. GH #27. A forked process spawns a subprocess of its
+      own for its next record; records already handed to the parent's
+      subprocess stay with the parent. A batch that cannot be handed over
+      is retried on a freshly spawned subprocess; only when that fails too
+      is it reported as dropped (reason subprocess-failed).
+    * force_flush and shutdown now order the export subprocess to drain its
+      queue and flush the exporter (shutdown also shuts it down), and wait
+      for it to acknowledge, reporting back the first failure of that whole
+      sequence. A flush whose timeout runs out leaves the subprocess working
+      on the rest in the background; a shutdown whose timeout runs out kills
+      it, losing the records it still held.
+    * The batch processor ignores records it receives after shutdown. Its
+      otel.processor.batch.buffer_use gauge was removed because the queue
+      now lives in the export subprocess, where this process's metrics
+      registry cannot observe it and the SDK self-observability metrics don't
+      specify it. Records dropped from a full queue are reported to
+      report_dropped (reason buffer-full) through the next acknowledgement
+      instead.
 
 0.101     2026-10-30 00:04:09 GMT
 

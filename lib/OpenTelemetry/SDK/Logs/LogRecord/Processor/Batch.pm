@@ -51,11 +51,12 @@ class OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch
         if ( $result == EXPORT_RESULT_SUCCESS ) {
             $metrics->inc_counter('success');
             $metrics->inc_counter_by( processed => $count );
-            return $self;
+            return $result;
         }
 
         $metrics->inc_counter('failure');
         $self->report_dropped( 'export-failure' => $count );
+        return $result;
     }
 
     method on_emit ($log) {
