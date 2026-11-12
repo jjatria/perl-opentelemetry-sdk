@@ -13,6 +13,10 @@ class OpenTelemetry::SDK::Logs::LogRecord::Processor::Batch
     use OpenTelemetry::Constants -export;
     use OpenTelemetry;
 
+    method procname :override {
+        return 'otel-batch-logs';
+    }
+
     use Metrics::Any '$metrics', strict => 1,
         name_prefix => [qw( otel processor batch )];
 
