@@ -142,7 +142,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             }
             catch ($e) {
                 undef $result;
-            };
+            }
         }
 
         return $result
