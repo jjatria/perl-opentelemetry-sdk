@@ -357,9 +357,12 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     # on the command channel with that countdown as its timeout, which
     # is what lets it export a partial batch on time even while this
     # process's creator sends it nothing. It never dies and never
-    # returns normally except after answering SHUTDOWN. A recv that
-    # fails for any reason (undecodable frame, read error) ends the loop
-    # just like EOF does: the stream can no longer be trusted, and the
+    # returns normally except after answering SHUTDOWN. Anything that
+    # breaks the command protocol ends the loop on the spot, leaving
+    # through the same disciplined exit: a recv that fails (undecodable
+    # frame, read error), a frame that does not fit the command
+    # contract, or a bug that dies inside command handling. All three
+    # mean the stream or the child can no longer be trusted, and the
     # parent treats an acknowledgement that never arrives as a dead
     # child.
     method _export_child ( $cmd, $cmd_handle, $ack ) {
@@ -462,10 +465,39 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             my ( $type, $args, $want_ack, $id ) =
                 ref $command eq 'ARRAY' ? $command->@* : ();
 
+            # Commands are produced only by this class's own methods,
+            # so a frame that does not fit the contract is either an
+            # SDK bug or a stream that has fallen out of step; neither
+            # can be recovered from command by command. Answering such
+            # a frame is impossible anyway: an ack carrying a stray id
+            # is discarded as a stale answer or, worse, consumed by
+            # the waiter this frame was never meant for. Report
+            # plainly — this process must not reach for the internal
+            # logger, whose appender chain leads into inherited locks
+            # and telemetry channels — and end the loop; the parent
+            # notices the dead subprocess through its own channels and
+            # respawns one for the next batch.
+            if (   ref $command ne 'ARRAY'
+                || !defined $type || ref $type
+                || !( $type eq 'DATA' || $type eq 'FLUSH' || $type eq 'SHUTDOWN' )
+                || ref $args ne 'ARRAY'
+                || ( $want_ack && !defined $id ) ) {
+                warn sprintf("export child: received malformed command frame from process %d; exiting\n",
+                    getppid);
+
+                last;
+            }
+
             my $result   = EXPORT_RESULT_FAILURE;
             my $exported = 0;
 
-            if ( $type ) {
+            # A bug that dies while a command is being handled must
+            # not unwind to the top of this process: an uncaught die
+            # would run END blocks and global destruction against the
+            # forked copies this process holds of the parent's state.
+            # Report, and leave the same way a malformed frame does.
+            my $fault;
+            try {
                 if ( $type eq 'DATA' ) {
                     push @queue, $args->@*;
 
@@ -526,21 +558,34 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                             if $down != EXPORT_RESULT_SUCCESS;
                     }
                 }
+
+                if ( $want_ack ) {
+                    $ack->send({
+                        id       => $id,
+                        result   => $result,
+                        exported => $exported,
+                        dropped  => { %dropped },
+                    }) or _exit 0;    # nobody left
+
+                    %dropped = ();
+                }
             }
+            catch ($e) {
+                $fault = $e;
+            };
 
-            if ( $want_ack ) {
-                $ack->send({
-                    id       => $id,
-                    result   => $result,
-                    exported => $exported,
-                    dropped  => { %dropped },
-                }) or _exit 0;    # nobody left
+            if ( $fault ) {
+                chomp( my $reason = "$fault" );
 
-                %dropped = ();
+                warn sprintf
+                    "export child: handling of a %s command died (%s); exiting\n",
+                    $type, $reason;
+
+                last;
             }
 
             last
-                if $type && $type eq 'SHUTDOWN';
+                if $type eq 'SHUTDOWN';
         }
 
         _exit 0;
