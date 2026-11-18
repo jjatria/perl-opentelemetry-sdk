@@ -565,7 +565,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
                         result   => $result,
                         exported => $exported,
                         dropped  => { %dropped },
-                    }) or _exit 0;    # nobody left
+                    }) or last;           # nobody left to answer
 
                     %dropped = ();
                 }
