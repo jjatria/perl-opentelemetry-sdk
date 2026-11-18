@@ -28,6 +28,12 @@ subtest Logger => sub {
     };
 
     no_messages {
+        # In-process harnesses like yath require this file into a
+        # process whose main package is the harness script itself,
+        # which defines $VERSION; pin the precondition of a caller
+        # package without a version.
+        local $main::VERSION;
+
         is my $logger = $provider->logger( name => undef, version => 123 ),
             object { prop isa => 'OpenTelemetry::SDK::Logs::Logger';
         }, 'Got logger even with bad name';
