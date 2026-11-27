@@ -15,7 +15,7 @@ use Mutex;
 sub sweep_fds {
     my $list = sub ( $dir ) {
         return ()
-            unless opendir my $dh, $dir;
+            unless opendir( my $dh, $dir );
         my @fds = grep { /^\d+\z/ && ( 0 + $_ ) > 2 } readdir $dh;
         closedir $dh;
 
