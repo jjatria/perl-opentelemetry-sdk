@@ -126,27 +126,23 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
     # since the export subprocess has no event loop to drive it. Nothing
     # here ever dies: failures report as EXPORT_RESULT_FAILURE.
     my $sync_call = sub ( $code ) {
-        my $result;
         try {
-            $result = $code->();
-        }
-        catch ($e) {
-            undef $result;
-        };
+            my $result = $code->();
 
-        if ( blessed $result && $result->isa('Future') ) {
-            return EXPORT_RESULT_TIMEOUT
-                unless $result->is_ready;
-            try {
+            if ( blessed $result && $result->isa('Future') ) {
+                return EXPORT_RESULT_TIMEOUT
+                    unless $result->is_ready;
+
                 $result = $result->get;
             }
-            catch ($e) {
-                undef $result;
-            }
+
+            return $result
+                if defined $result && $result =~ /\A[012]\z/;
+        }
+        catch ($e) {
+            # fallback to the return below
         }
 
-        return $result
-            if defined $result && $result =~ /\A[012]\z/;
         return EXPORT_RESULT_FAILURE;
     };
 
@@ -570,7 +566,7 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             }
             catch ($e) {
                 $fault = $e;
-            };
+            }
 
             if ( $fault ) {
                 chomp( my $reason = "$fault" );
