@@ -3,8 +3,11 @@ Revision history for OpenTelemetry-SDK
 {{$NEXT}}
 
     * Remove OTEL_PERL_BSP_MAX_WORKERS environment variable
-      Because the spec states that "the batching processor MUST synchronize
-      calls to the exporter to make sure they are not invoked concurrently"
+      because the spec states that "the batching processor MUST
+      synchronize calls to the exporter to make sure they are
+      not invoked concurrently". Setting this environment to anything
+      other than 1 will raise a warning.
+    * Made some of the tests more lenient to prevent false negatives.
 
 0.101     2026-10-30 00:04:09 GMT
 
