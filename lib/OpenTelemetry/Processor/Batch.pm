@@ -451,16 +451,14 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
             next
                 unless $ready;
 
-            my $command;
-            try {
-                $command = $cmd->recv;
-            }
-            catch ($e) {
-                undef $command;
+            my $command = do {
+                try {
+                    $cmd->recv;
+                }
+                catch ($e) {
+                    last;
+                }
             };
-
-            last
-                unless defined $command;
 
             my ( $type, $args, $want_ack, $id ) =
                 ref $command eq 'ARRAY' ? $command->@* : ();
