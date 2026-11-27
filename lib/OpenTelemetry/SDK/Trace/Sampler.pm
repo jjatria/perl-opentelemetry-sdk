@@ -3,7 +3,7 @@ use Object::Pad;
 package OpenTelemetry::SDK::Trace::Sampler;
 # ABSTRACT: The abstract interface for a sampler object
 
-our $VERSION = '0.102';
+our $VERSION = '0.103';
 
 role OpenTelemetry::SDK::Trace::Sampler {
     method description;
