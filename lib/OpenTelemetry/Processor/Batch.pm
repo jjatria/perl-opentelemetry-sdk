@@ -32,37 +32,11 @@ class OpenTelemetry::Processor::Batch :does(OpenTelemetry::Processor) {
 
     my $logger = OpenTelemetry::Common::internal_logger;
 
-    # Records, and everything that goes with them, are handed to the
-    # export subprocess, which owns the queue, the batch boundaries, and
-    # the schedule. Commands travel over one IO::Async::Channel as
-    # [ $type, $args, $want_ack, $id ] array references: DATA carries
-    # records to queue, FLUSH and SHUTDOWN ask the subprocess to drain
-    # the queue and call the exporter's flush (and, for SHUTDOWN,
-    # shutdown) before acknowledging on a second channel with a hash
-    # reference { id, result, exported, dropped }. Every command this
-    # class sends that asks for an answer is sent and read under the
-    # same lock, so at most one acknowledgement is awaited at a time and
-    # late answers of abandoned flushes are recognised by their id.
-    # Both ends of both channels run in the channel's synchronous mode:
-    # blocking send and recv over a socketpair. The selector timeouts in
-    # the subprocess and in _read_ack are what this class has instead of
-    # an event loop. The exporter interface is synchronous, so no loop
-    # could drive it anyway. The Storable codec is chosen explicitly so
-    # the framing does not depend on which optional serialisers are
-    # installed. Tt round-trips the Object::Pad based record and span
-    # objects.
-    #
-    # The :unix layer is essential, not cosmetic: synchronous-mode
-    # channels read with the buffered read(), which can pull the next
-    # frame's bytes into the handle's userspace buffer. A select() on
-    # the descriptor cannot see those bytes, so a selector loop would
-    # wait on an apparently idle socket while a whole waiting frame sits
-    # unread in that buffer. An unbuffered layer keeps read() and
-    # select() looking at the same bytes.
     my $sync_channel = sub ( $handle ) {
         $handle->blocking( 1 );
         my $channel = IO::Async::Channel->new( codec => 'Storable' );
         $channel->setup_sync_mode( $handle );
+        # disable buffering
         binmode $handle, ':unix';
         return $channel;
     };
