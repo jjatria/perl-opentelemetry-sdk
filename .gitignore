@@ -3,6 +3,7 @@
 *.swo
 .build/
 cover*/
+ignore/
 
 # Build artifacts
 Build
