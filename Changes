@@ -2,6 +2,8 @@ Revision history for OpenTelemetry-SDK
 
 {{$NEXT}}
 
+0.102     2026-11-27 16:58:45 GMT
+
     * Remove OTEL_PERL_BSP_MAX_WORKERS environment variable
       because the spec states that "the batching processor MUST
       synchronize calls to the exporter to make sure they are
