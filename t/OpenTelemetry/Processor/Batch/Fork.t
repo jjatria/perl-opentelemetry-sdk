@@ -38,7 +38,7 @@ defined $child
 if ( !$child ) {
     my $ok = 1;
     try {
-        local $SIG{ALRM} = sub { die "wedge\n" };
+        local $SIG{ALRM} = sub { die "blocked\n" };
         alarm 20;
 
         $processor->process({ child => $_ }) for 1 .. 3;
@@ -54,7 +54,7 @@ if ( !$child ) {
 }
 
 waitpid $child, 0;
-is $?, 0, 'the forked child used the processor without wedging';
+is $?, 0, 'the forked child used the processor without blocking';
 
 # The child exported its batch and nothing else: the records the
 # parent had sent to its own export child are still pending there, and
@@ -101,7 +101,7 @@ defined $child
 if ( !$child ) {
     my $ok = 1;
     try {
-        local $SIG{ALRM} = sub { die "wedge\n" };
+        local $SIG{ALRM} = sub { die "blocked\n" };
         alarm 20;
 
         my $kid = $provider->logger( name => 'test-child' );
