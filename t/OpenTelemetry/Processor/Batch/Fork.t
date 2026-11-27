@@ -29,8 +29,11 @@ my $processor = OpenTelemetry::Processor::Batch->new(
 # batch size (and therefore not exported there yet).
 $processor->process({ parent => $_ }) for 1 .. 2;
 
+# A working fork is a hard requirement of the batch processor, so a
+# failed fork here means a broken environment, not a platform to skip on.
 my $child = fork;
-defined $child or plan skip_all => "cannot fork: $!";
+defined $child
+    or bail_out "cannot fork: $!";
 
 if ( !$child ) {
     my $ok = 1;
@@ -92,7 +95,8 @@ my $logger = $provider->logger( name => 'test-parent' );
 $logger->emit_record( body => 'parent' ) for 1 .. 2;
 
 $child = fork;
-defined $child or plan skip_all => "cannot fork: $!";
+defined $child
+    or bail_out "cannot fork: $!";
 
 if ( !$child ) {
     my $ok = 1;
