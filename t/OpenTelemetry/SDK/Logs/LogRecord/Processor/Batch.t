@@ -10,14 +10,21 @@ use lib 't/lib';
 use Local::Exporter::File;
 
 describe on_emit => sub {
-    my ( $log_record, @calls, @logs );
+    my ( $log_record, $calls, @logs );
 
     case 'Log' => sub {
         $log_record = 'my-log';
-        @calls = (
-            [ export   => [ 'my-log', 'my-log' ], 30_000 ],
-            [ 'force_flush' ],
-            [ 'shutdown' ],
+        $calls = check_set(
+            # These might come in any order
+            bag {
+                item [ export => [ 'my-log', 'my-log' ], 30_000 ];
+                item [ 'force_flush' ];
+                etc;
+            },
+            array {
+                item 2 => [ 'shutdown' ];
+                end;
+            },
         );
     };
 
@@ -42,7 +49,10 @@ describe on_emit => sub {
         # Make sure we wait before reading the calls
         $processor->shutdown->get;
 
-        is $exporter->calls, \@calls, 'Correct calls on exporter';
+        is $exporter->calls, $calls, 'Correct calls on exporter' or do {
+            require Data::Dumper;
+            diag 'Got ' . Data::Dumper::Dumper($exporter->calls);
+        };
     };
 };
 
