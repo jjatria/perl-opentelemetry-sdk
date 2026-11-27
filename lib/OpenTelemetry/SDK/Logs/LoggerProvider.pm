@@ -9,10 +9,10 @@ class OpenTelemetry::SDK::Logs::LoggerProvider
     :isa(OpenTelemetry::Logs::LoggerProvider)
 {
     use Future::AsyncAwait;
-    use Mutex;
     use OpenTelemetry::Common qw( timeout_timestamp maybe_timeout );
     use OpenTelemetry::Constants -export;
     use OpenTelemetry::SDK::InstrumentationScope;
+    use OpenTelemetry::SDK::Lock;
     use OpenTelemetry::SDK::Logs::Logger;
     use OpenTelemetry::SDK::Logs::LogRecord;
     use OpenTelemetry::SDK::Resource;
@@ -24,8 +24,8 @@ class OpenTelemetry::SDK::Logs::LoggerProvider
     field %registry;
     field @processors;
 
-    field $lock          //= Mutex->new;
-    field $registry_lock //= Mutex->new;
+    field $lock          //= OpenTelemetry::SDK::Lock->new;
+    field $registry_lock //= OpenTelemetry::SDK::Lock->new;
 
     my $logger = OpenTelemetry::Common::internal_logger;
 
