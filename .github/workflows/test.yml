@@ -17,23 +17,24 @@ jobs:
 
         # All supported Perl versions except latest.
         perl: [
+          '5.40', '5.42',
           '5.30', '5.32', '5.34', '5.36', '5.38'
         ]
 
         # Variants of the latest Perl.
         include:
           - os: macos-latest
-            perl: '5.40'
+            perl: '5.44'
 
         # FIXME: Windows tests started failing around the time we
         # moved to lvalue setters. Why?
         # - os: windows-latest
-        #   perl: '5.40'
+        #   perl: '5.44'
 
           # This is effectively our normal one: all features and cover.
           - name: ' (all)'
             os: ubuntu-latest
-            perl: '5.40'
+            perl: '5.44'
             cover: true
 
     runs-on: ${{ matrix.os }}
